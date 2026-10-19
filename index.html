@@ -1,0 +1,889 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<style>:root{color-scheme:dark;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0;font:14px/1.5 system-ui,sans-serif}img{max-width:100%}[hidden]{display:none!important}</style>
+</head>
+<body>
+<title>Floating Solar Digital Twin</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Anuphan:wght@400;500;600&family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  /* Layout: full-height control room. 3D twin of the site on the left, sensor column on the right; stacks on phones.
+     Deliberately single dark theme, matching the original control-room look. */
+  --bg: #060E14;
+  --surface: #0C1A23;
+  --surface2: #10222D;
+  --line: rgba(140, 190, 215, .12);
+  --line2: rgba(140, 190, 215, .24);
+  --fg: #E7F2F6;
+  --muted: #8AA3AE;
+  --dim: #5F7884;
+  --accent: #56D6F5;
+  --a: #FFCB3D;
+  --b: #FF8A3A;
+  --good: #3DDC91;
+  --warn: #F5B83D;
+  --bad: #FF6767;
+  --glass: rgba(8, 20, 28, .66);
+  --sans: 'Geist', 'Anuphan', system-ui, sans-serif;
+  --thai: 'Anuphan', 'Geist', system-ui, sans-serif;
+  --mono: 'Geist Mono', ui-monospace, 'SFMono-Regular', monospace;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html { height: 100%; box-sizing: border-box; }
+body {
+  height: 100%;
+  background: radial-gradient(1200px 600px at 20% -10%, #0E2633 0%, transparent 60%), var(--bg);
+  color: var(--fg);
+  font-family: var(--sans);
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  padding-block: 14px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+button { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.thai { font-family: var(--thai); }
+
+.app { height: 100%; display: flex; flex-direction: column; gap: 14px; min-height: 620px; }
+
+/* Top bar */
+.bar { display: flex; align-items: center; justify-content: space-between; gap: 12px 20px; flex-wrap: wrap; }
+.brand { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.logo { width: 36px; height: 36px; border-radius: 10px; display: grid; place-items: center; background: linear-gradient(140deg, #123446, #0B1C26); border: 1px solid var(--line2); flex: none; }
+.brand h1 { margin: 0; font-size: 17px; font-weight: 600; letter-spacing: -.01em; line-height: 1.2; }
+.brand p { margin: 0; font-size: 12.5px; color: var(--muted); }
+.bar-right { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.chip { display: inline-flex; align-items: center; gap: 7px; height: 30px; padding: 0 12px; border-radius: 999px; border: 1px solid var(--line2); background: var(--surface); font-size: 12.5px; color: var(--muted); white-space: nowrap; }
+.chip.demo { color: var(--warn); border-color: color-mix(in srgb, var(--warn) 40%, transparent); font-family: var(--thai); }
+.chip.live::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--good); box-shadow: 0 0 0 3px color-mix(in srgb, var(--good) 22%, transparent); }
+.clock { font-family: var(--mono); font-variant-numeric: tabular-nums; color: var(--fg); }
+
+/* Main grid */
+.main { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) 430px; gap: 14px; }
+
+/* 3D scene */
+.scene { position: relative; min-width: 0; min-height: 0; border-radius: 18px; overflow: hidden; border: 1px solid var(--line); background: #07131B; isolation: isolate; }
+#gl { display: block; width: 100%; height: 100%; touch-action: none; cursor: grab; }
+#gl:active { cursor: grabbing; }
+.labels { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+.lbl { position: absolute; left: 0; top: 0; white-space: nowrap; font-size: 11.5px; color: var(--fg); padding: 3px 9px; border-radius: 999px; background: var(--glass); border: 1px solid rgba(255,255,255,.1); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); font-family: var(--thai); will-change: transform; }
+.lbl.soft { color: var(--muted); background: rgba(8, 20, 28, .45); }
+.lbl.buoy { pointer-events: auto; cursor: pointer; display: flex; align-items: center; gap: 8px; padding: 5px 11px 5px 7px; font-size: 12px; transition: border-color .2s, background .2s; }
+.lbl.buoy i { width: 18px; height: 18px; border-radius: 50%; display: grid; place-items: center; font-style: normal; font-family: var(--sans); font-weight: 700; font-size: 10.5px; color: #1A1200; }
+.lbl.buoy b { font-family: var(--mono); font-weight: 500; font-variant-numeric: tabular-nums; }
+.lbl.buoy.sel { border-color: var(--accent); background: rgba(10, 34, 46, .82); box-shadow: 0 0 0 3px rgba(86, 214, 245, .14); }
+.lbl.arrow { font-weight: 500; }
+
+.tools { position: absolute; top: 12px; right: 12px; display: flex; gap: 6px; padding: 4px; border-radius: 12px; background: var(--glass); border: 1px solid rgba(255,255,255,.08); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
+.tools button { border: 0; background: transparent; height: 30px; padding: 0 12px; border-radius: 8px; font-size: 12.5px; color: var(--muted); cursor: pointer; font-family: var(--thai); }
+.tools button:hover { color: var(--fg); background: rgba(255,255,255,.05); }
+.tools button[aria-pressed="true"] { background: rgba(86, 214, 245, .14); color: var(--accent); }
+.legend { position: absolute; left: 12px; bottom: 12px; display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: center; padding: 8px 12px; border-radius: 12px; background: var(--glass); border: 1px solid rgba(255,255,255,.08); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); font-size: 12px; font-family: var(--thai); color: var(--muted); max-width: calc(100% - 24px); }
+.legend span { display: inline-flex; align-items: center; gap: 7px; }
+.legend i { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
+.hint { position: absolute; right: 12px; bottom: 12px; font-size: 11.5px; color: var(--dim); font-family: var(--thai); padding: 6px 10px; }
+.glfail { position: absolute; inset: 0; display: grid; place-items: center; padding: 24px; text-align: center; color: var(--muted); font-family: var(--thai); }
+
+/* Sensor column */
+.panel { min-width: 0; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; padding-right: 2px; scrollbar-width: thin; }
+.seg { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; padding: 4px; border-radius: 14px; background: var(--surface); border: 1px solid var(--line); }
+.seg button { display: flex; flex-direction: column; align-items: flex-start; gap: 1px; border: 0; background: transparent; border-radius: 10px; padding: 8px 12px; cursor: pointer; text-align: left; min-width: 0; transition: background .2s; }
+.seg button b { display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: 14px; }
+.seg button b i { width: 9px; height: 9px; border-radius: 50%; }
+.seg button span { font-size: 12px; color: var(--muted); font-family: var(--thai); }
+.seg button:hover { background: rgba(255,255,255,.03); }
+.seg button[aria-pressed="true"] { background: var(--surface2); box-shadow: inset 0 0 0 1px var(--line2); }
+
+.sel-head { display: flex; flex-direction: column; gap: 2px; padding: 4px 2px 0; }
+.sel-head h2 { margin: 0; font-size: 20px; font-weight: 600; letter-spacing: -.015em; font-family: var(--thai); text-wrap: balance; }
+.sel-head small { font-family: var(--mono); font-size: 11.5px; color: var(--dim); }
+
+.metrics { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.metric { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 12px 14px 12px; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.metric .k { font-size: 12px; color: var(--muted); letter-spacing: .01em; }
+.metric .v { display: flex; align-items: baseline; gap: 5px; }
+.metric .v b { font-size: 28px; font-weight: 600; letter-spacing: -.03em; font-variant-numeric: tabular-nums; line-height: 1.1; }
+.metric .v u { text-decoration: none; color: var(--muted); font-size: 14px; }
+.metric p { margin: 0; font-size: 11.5px; color: var(--dim); font-family: var(--thai); font-variant-numeric: tabular-nums; }
+.status { display: inline-flex; align-items: center; gap: 8px; font-weight: 600; font-size: 18px; letter-spacing: .04em; color: var(--good); line-height: 1.55; }
+.status::before { content: ""; width: 9px; height: 9px; border-radius: 50%; background: currentColor; animation: live 2s ease-out infinite; }
+@keyframes live { 0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--good) 55%, transparent); } 100% { box-shadow: 0 0 0 9px transparent; } }
+
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 14px; min-width: 0; }
+.card h3 { margin: 0; font-size: 13px; font-weight: 600; letter-spacing: .01em; }
+
+.reduce { display: grid; grid-template-columns: 112px minmax(0, 1fr); gap: 16px; align-items: center; background: linear-gradient(135deg, color-mix(in srgb, var(--good) 8%, var(--surface)), var(--surface) 60%); }
+.gauge { width: 112px; height: 112px; position: relative; }
+.gauge svg { width: 100%; height: 100%; transform: rotate(-90deg); }
+.gauge .track { fill: none; stroke: rgba(255,255,255,.06); stroke-width: 10; }
+.gauge .fill { fill: none; stroke: var(--good); stroke-width: 10; stroke-linecap: round; transition: stroke-dashoffset .8s cubic-bezier(.2,.7,.2,1), stroke .3s; }
+.gauge .num { position: absolute; inset: 0; display: grid; place-items: center; text-align: center; }
+.gauge .num b { font-size: 26px; font-weight: 600; letter-spacing: -.03em; font-variant-numeric: tabular-nums; line-height: 1; }
+.gauge .num b small { font-size: 13px; color: var(--muted); font-weight: 500; margin-left: 1px; }
+.reduce-body { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.reduce-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.grade { font-size: 11.5px; font-weight: 500; padding: 2px 10px; border-radius: 999px; font-family: var(--thai); }
+.grade.good { color: var(--good); background: color-mix(in srgb, var(--good) 14%, transparent); }
+.grade.warn { color: var(--warn); background: color-mix(in srgb, var(--warn) 14%, transparent); }
+.grade.bad { color: var(--bad); background: color-mix(in srgb, var(--bad) 14%, transparent); }
+.flow { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-variant-numeric: tabular-nums; }
+.flow .pt { display: inline-flex; align-items: center; gap: 6px; font-size: 15px; font-weight: 600; }
+.flow .pt i { width: 8px; height: 8px; border-radius: 50%; }
+.flow .to { color: var(--dim); }
+.reduce p { margin: 0; font-size: 12px; color: var(--muted); font-family: var(--thai); }
+
+.chart-card { display: flex; flex-direction: column; gap: 8px; }
+.chart-top { display: flex; align-items: center; justify-content: space-between; gap: 8px 14px; flex-wrap: wrap; }
+.clegend { display: flex; gap: 12px; font-size: 11.5px; color: var(--muted); }
+.clegend span { display: inline-flex; align-items: center; gap: 6px; }
+.clegend i { width: 14px; height: 3px; border-radius: 2px; }
+.chartwrap { position: relative; }
+#chart { display: block; width: 100%; height: auto; touch-action: pan-y; }
+#chart text { font-family: var(--mono); font-size: 10.5px; fill: var(--dim); font-variant-numeric: tabular-nums; }
+#chart .gl { stroke: rgba(140, 190, 215, .09); stroke-width: 1; }
+#chart .gl0 { stroke: rgba(140, 190, 215, .25); }
+#chart .ln { fill: none; stroke-linejoin: round; stroke-linecap: round; }
+#chart .guide { stroke: rgba(231, 242, 246, .35); stroke-width: 1; stroke-dasharray: 3 3; }
+.tip { position: absolute; top: 0; pointer-events: none; background: rgba(6, 16, 22, .92); border: 1px solid var(--line2); border-radius: 10px; padding: 7px 10px; font-size: 11.5px; min-width: 128px; backdrop-filter: blur(6px); }
+.tip .t { font-family: var(--mono); color: var(--muted); margin-bottom: 3px; }
+.tip div { display: flex; justify-content: space-between; gap: 12px; font-variant-numeric: tabular-nums; }
+.tip div span { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); }
+.tip div span i { width: 7px; height: 7px; border-radius: 50%; }
+.chart-foot { display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; font-size: 11px; color: var(--dim); font-family: var(--thai); }
+
+.play { display: inline-flex; align-items: center; gap: 8px; }
+.play > span { font-size: 12px; color: var(--warn); font-family: var(--thai); white-space: nowrap; }
+.mini { display: inline-flex; gap: 2px; padding: 3px; border-radius: 10px; background: var(--bg); border: 1px solid var(--line); }
+.mini button { border: 0; background: transparent; height: 26px; padding: 0 10px; border-radius: 7px; font-size: 12px; color: var(--muted); cursor: pointer; font-family: var(--thai); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.mini button:hover { color: var(--fg); }
+.mini button[aria-pressed="true"] { background: var(--surface2); color: var(--fg); box-shadow: inset 0 0 0 1px var(--line2); }
+.status.off { color: var(--bad); }
+.status.off::before { animation: none; }
+.grade.none { color: var(--muted); background: rgba(255, 255, 255, .06); }
+.tip b.na { color: var(--bad); font-weight: 500; }
+.note { margin: 0; font-size: 11.5px; color: var(--dim); font-family: var(--thai); padding: 0 2px 4px; }
+
+@media (max-width: 980px) {
+  body { height: auto; }
+  .app { height: auto; min-height: 0; }
+  .main { grid-template-columns: minmax(0, 1fr); }
+  .scene { height: 62vh; min-height: 380px; max-height: 640px; }
+  .panel { overflow: visible; padding-right: 0; }
+  .hint { display: none; }
+  .lbl.buoy .lt { display: none; }
+}
+@media (max-width: 460px) {
+  .reduce { grid-template-columns: 96px minmax(0, 1fr); gap: 12px; }
+  .gauge { width: 96px; height: 96px; }
+  .metric .v b { font-size: 24px; }
+  .tools button { padding: 0 9px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .status::before { animation: none; }
+  .gauge .fill { transition: none; }
+}
+</style>
+
+<div class="app">
+  <header class="bar">
+    <div class="brand">
+      <div class="logo" aria-hidden="true">
+        <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><rect x="3" y="3" width="6" height="6" rx="1.2" stroke="#56D6F5" stroke-width="1.6"/><rect x="11" y="3" width="6" height="6" rx="1.2" stroke="#56D6F5" stroke-width="1.6"/><rect x="3" y="11" width="6" height="6" rx="1.2" stroke="#56D6F5" stroke-width="1.6"/><path d="M11 15c1-1.3 2-1.3 3 0s2 1.3 3 0" stroke="#FFCB3D" stroke-width="1.6" stroke-linecap="round"/></svg>
+      </div>
+      <div>
+        <h1>Floating Solar Digital Twin</h1>
+        <p>Wave &amp; Sensor Monitoring</p>
+      </div>
+    </div>
+    <div class="bar-right">
+      <div class="play"><span>ข้อมูลจำลอง · เล่นซ้ำ</span>
+        <div class="mini" role="group" aria-label="ความเร็วการเล่นข้อมูล">
+          <button type="button" id="sp1" aria-pressed="false">×1</button>
+          <button type="button" id="sp30" aria-pressed="true">×30</button>
+          <button type="button" id="sp300" aria-pressed="false">×300</button>
+        </div>
+      </div>
+      <span class="chip live"><span class="clock" id="clock">--/--/---- --:--:--</span></span>
+    </div>
+  </header>
+
+  <main class="main">
+    <section class="scene" id="scene" aria-label="มุมมอง 3 มิติของพื้นที่โซลาร์ลอยน้ำ">
+      <canvas id="gl"></canvas>
+      <div class="labels" id="labels"></div>
+      <div class="tools" role="group" aria-label="มุมกล้อง">
+        <button type="button" id="v3d" aria-pressed="true">3D</button>
+        <button type="button" id="vtop" aria-pressed="false">มุมบน</button>
+        <button type="button" id="vside" aria-pressed="false">ระดับน้ำ</button>
+      </div>
+      <div class="legend">
+        <span>↑ ทิศทางคลื่น</span>
+        <span><i style="background:var(--a)"></i>Buoy A ก่อนแผงกันคลื่น</span>
+        <span><i style="background:var(--b)"></i>Buoy B หลังแผงกันคลื่น</span>
+      </div>
+      <div class="hint">ลากเพื่อหมุน · เลื่อนเพื่อซูม · คลิกทุ่นเพื่อเลือก Sensor</div>
+      <div class="glfail" id="glfail" hidden>เบราว์เซอร์นี้แสดงภาพ 3D ไม่ได้ ข้อมูลเซนเซอร์ด้านขวายังใช้งานได้ตามปกติ</div>
+    </section>
+
+    <aside class="panel">
+      <div class="seg" role="group" aria-label="เลือก Sensor">
+        <button type="button" id="tabA" aria-pressed="true"><b><i style="background:var(--a)"></i>Buoy A</b><span>ก่อนแผงกันคลื่น</span></button>
+        <button type="button" id="tabB" aria-pressed="false"><b><i style="background:var(--b)"></i>Buoy B</b><span>หลังแผงกันคลื่น</span></button>
+      </div>
+
+      <div class="sel-head">
+        <h2 id="selTitle">Buoy A · ก่อนแผงกันคลื่น</h2>
+        <small id="ago">กำลังโหลดข้อมูล</small>
+      </div>
+
+      <div class="metrics">
+        <article class="metric"><div class="k">Wave Height</div><div class="v"><b id="mH">0.00</b><u>m</u></div><p id="mHs">–</p></article>
+        <article class="metric"><div class="k">Period</div><div class="v"><b id="mP">0.00</b><u>s</u></div><p id="mPs">–</p></article>
+        <article class="metric"><div class="k">Temperature</div><div class="v"><b id="mT">0.0</b><u>°C</u></div><p>อุณหภูมิผิวน้ำที่ทุ่น</p></article>
+        <article class="metric"><div class="k">Status</div><div class="status" id="mS">ONLINE</div><p id="mSs">ส่งข้อมูลทุก 1 นาที</p></article>
+      </div>
+
+      <section class="card reduce" aria-labelledby="wrT">
+        <div class="gauge">
+          <svg viewBox="0 0 120 120" aria-hidden="true"><circle class="track" cx="60" cy="60" r="50"/><circle class="fill" id="gFill" cx="60" cy="60" r="50" stroke-dasharray="314.16" stroke-dashoffset="314.16"/></svg>
+          <div class="num"><b><span id="wr">0.0</span><small>%</small></b></div>
+        </div>
+        <div class="reduce-body">
+          <div class="reduce-top"><h3 id="wrT">Wave Reduction</h3><span class="grade good" id="grade">–</span></div>
+          <div class="flow">
+            <span class="pt"><i style="background:var(--a)"></i><span id="rA">0.00 m</span></span>
+            <span class="to">→</span>
+            <span class="pt"><i style="background:var(--b)"></i><span id="rB">0.00 m</span></span>
+          </div>
+          <p>ความสูงคลื่นที่ลดลงหลังผ่านแผงกันคลื่น คำนวณจาก 1 − H<sub>B</sub>/H<sub>A</sub></p>
+        </div>
+      </section>
+
+      <section class="card chart-card" aria-labelledby="chT">
+        <div class="chart-top">
+          <h3 id="chT">Realtime Wave Height</h3>
+          <div class="mini" role="group" aria-label="ช่วงเวลาของกราฟ">
+            <button type="button" id="rg-live" aria-pressed="true">90 นาที</button>
+            <button type="button" id="rg-24h" aria-pressed="false">24 ชม.</button>
+            <button type="button" id="rg-7d" aria-pressed="false">7 วัน</button>
+          </div>
+        </div>
+        <div class="chartwrap" id="chartwrap">
+          <svg id="chart" viewBox="0 0 600 250" role="img" aria-label="กราฟความสูงคลื่นของ Buoy A และ Buoy B"></svg>
+          <div class="tip" id="tip" hidden></div>
+        </div>
+        <div class="chart-foot"><div class="clegend"><span><i style="background:var(--a)"></i>Buoy A</span><span><i style="background:var(--b)"></i>Buoy B</span><span>m</span></div><span id="rangeNote"></span></div>
+      </section>
+
+      <p class="note">ข้อมูลจำลอง 7 วัน บันทึกทุก 1 นาที สร้างจากแบบจำลองลม → คลื่นแบบ fetch-limited (fetch 6 km) และสัมประสิทธิ์การส่งผ่านคลื่นของ Macagno (แผงกว้าง 4 m กินน้ำ 0.8 m ความลึกน้ำ 10 m) มีเหตุการณ์พายุฝนฟ้าคะนองในวันที่ 5 และ Buoy B ขาดสัญญาณ 45 นาทีในวันที่ 4 วันที่ถูกเลื่อนให้วันสุดท้ายตรงกับวันนี้</p>
+    </aside>
+  </main>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script>
+(function () {
+  'use strict';
+  var $ = function (id) { return document.getElementById(id); };
+  var reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var COLORS = { A: '#FFCB3D', B: '#FF8A3A' };
+  var state = { sel: 'A' };
+
+  /* ---------------- Demo dataset (synthetic 1-minute records, see demo-data.json) ---------------- */
+  function mulberry32(a) { return function () { a |= 0; a = a + 0x6D2B79F5 | 0; var t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+  function clamp(v, a, b) { return Math.max(a, Math.min(b, v)); }
+  var G9 = 9.81, D = null, OFF = 0, cursor = 0, cursorF = 0, speed = 30, range = 'live';
+
+  /* Same physics as the published dataset, simplified; used only if demo-data.json cannot be loaded */
+  function fallbackData() {
+    var n = 7 * 1440, d = { start: '2026-10-12T00:00:00+07:00', interval_s: 60, count: n, wind: [], A: { h: [], p: [], c: [] }, B: { h: [], p: [], c: [] } };
+    var r = mulberry32(7), hs = 0.1, tp = 1.4, syn = [0.85, 1.05, 1.2, 0.95, 1.3, 0.8, 1];
+    for (var i = 0; i < n; i++) {
+      var hr = (i % 1440) / 60;
+      var U = Math.max(0.6, (2.2 + 4 * Math.pow(Math.max(0, Math.sin(Math.PI * (hr - 8.5) / 13)), 1.3)) * syn[Math.floor(i / 1440)] + (r() - 0.5) * 0.8);
+      var X = G9 * 6000 / (U * U);
+      hs += 0.08 * (0.0016 * Math.sqrt(X) * U * U / G9 - hs);
+      tp += 0.08 * (0.2857 * Math.cbrt(X) * U / G9 - tp);
+      var hA = Math.max(0.03, hs * (1 + (r() - 0.5) * 0.1) + 0.02), pA = Math.max(1, tp * (1 + (r() - 0.5) * 0.07));
+      var k = 4 * Math.PI * Math.PI / (G9 * pA * pA);
+      var kt = Math.min(1, 1 / Math.sqrt(1 + Math.pow(k * 2 * Math.exp(k * 0.8), 2)) + 0.03);
+      var tw = 29.1 - 0.09 * i / 1440 + 0.65 * Math.sin(2 * Math.PI * (hr - 9.5) / 24);
+      d.wind.push(+U.toFixed(2));
+      d.A.h.push(+hA.toFixed(3)); d.A.p.push(+pA.toFixed(2)); d.A.c.push(+tw.toFixed(2));
+      d.B.h.push(+(hA * kt).toFixed(3)); d.B.p.push(+(pA * 1.06).toFixed(2)); d.B.c.push(+(tw + 0.1).toFixed(2));
+    }
+    return d;
+  }
+  function useData(d) {
+    D = { t0: Date.parse(d.start), dt: d.interval_s * 1000, n: d.count, wind: d.wind, A: d.A, B: d.B };
+    var days = Math.round(D.n * D.dt / 86400000);
+    var today = new Date(); today.setHours(0, 0, 0, 0);
+    OFF = Math.round((today.getTime() - (D.t0 + (days - 1) * 86400000)) / 86400000) * 86400000;
+    syncNow();
+  }
+  function syncNow() {
+    cursor = clamp(Math.round((Date.now() - OFF - D.t0) / D.dt), 90, D.n - 1);
+    cursorF = cursor;
+    renderPanel();
+  }
+  function tOf(i) { return D.t0 + i * D.dt + OFF; }
+  function val(id, i) { var h = D[id].h[i]; return h == null ? null : { h: h, p: D[id].p[i], c: D[id].c[i] }; }
+  function redOf(a, b) { return (a == null || b == null || a < 0.005) ? null : Math.max(0, (1 - b / a) * 100); }
+  function red(i) { return redOf(D.A.h[i], D.B.h[i]); }
+  function fmtHM(t) { return new Date(t).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: false }); }
+  function fmtDay(t) { return new Date(t).toLocaleDateString('th-TH', { weekday: 'short', day: 'numeric' }); }
+
+  /* ---------------- Clock ---------------- */
+  function tickClock() {
+    var d = new Date();
+    $('clock').textContent = d.toLocaleDateString('th-TH') + ' ' + d.toLocaleTimeString('th-TH', { hour12: false });
+  }
+
+  /* ---------------- Chart ---------------- */
+  var NS = 'http://www.w3.org/2000/svg';
+  var CW = 600, CH = 250, ML = 40, MR = 10, MT = 12, MB = 26, YM = 1, NPT = 90;
+  function X(i) { return ML + (CW - ML - MR) * i / Math.max(1, NPT - 1); }
+  function Y(v) { return MT + (CH - MT - MB) * (1 - Math.min(v, YM) / YM); }
+  var svg = $('chart');
+  function el(tag, attrs, parent, text) {
+    var e = document.createElementNS(NS, tag);
+    for (var a in attrs) e.setAttribute(a, attrs[a]);
+    if (text != null) e.textContent = text;
+    (parent || svg).appendChild(e);
+    return e;
+  }
+  var defs = el('defs', {});
+  ['A', 'B'].forEach(function (id) {
+    var g = el('linearGradient', { id: 'gr' + id, x1: 0, y1: 0, x2: 0, y2: 1 }, defs);
+    el('stop', { offset: '0%', 'stop-color': COLORS[id], 'stop-opacity': .28 }, g);
+    el('stop', { offset: '100%', 'stop-color': COLORS[id], 'stop-opacity': 0 }, g);
+  });
+  var axes = el('g', {}), xl = el('g', {});
+  var area = el('path', { d: '' });
+  var lnB = el('path', { 'class': 'ln', stroke: COLORS.B, d: '' });
+  var lnA = el('path', { 'class': 'ln', stroke: COLORS.A, d: '' });
+  var guide = el('line', { 'class': 'guide', y1: MT, y2: CH - MB, x1: 0, x2: 0, visibility: 'hidden' });
+  var dB = el('circle', { r: 3.5, fill: COLORS.B, stroke: '#0C1A23', 'stroke-width': 2 });
+  var dA = el('circle', { r: 3.5, fill: COLORS.A, stroke: '#0C1A23', 'stroke-width': 2 });
+  var hover = -1, S = null;
+  var RANGE_NOTE = { live: 'Sensor Time · ทุก 1 นาที · 90 นาทีล่าสุด', '24h': 'ค่าเฉลี่ยทุก 10 นาที · 24 ชั่วโมงล่าสุด', '7d': 'ค่าเฉลี่ยรายชั่วโมง · 7 วันล่าสุด' };
+
+  function series() {
+    var out = { A: [], B: [], t: [] };
+    if (range === 'live') {
+      for (var i = Math.max(0, cursor - 89); i <= cursor; i++) { out.A.push(D.A.h[i]); out.B.push(D.B.h[i]); out.t.push(tOf(i)); }
+      return out;
+    }
+    var bin = range === '24h' ? 10 : 60, span = range === '24h' ? 1440 : 7 * 1440;
+    for (var b0 = cursor - span + 1; b0 <= cursor; b0 += bin) {
+      var b1 = Math.min(b0 + bin - 1, cursor), sa = 0, na = 0, sb = 0, nb = 0;
+      for (var j = Math.max(0, b0); j <= b1; j++) {
+        if (D.A.h[j] != null) { sa += D.A.h[j]; na++; }
+        if (D.B.h[j] != null) { sb += D.B.h[j]; nb++; }
+      }
+      out.A.push(na ? sa / na : null); out.B.push(nb ? sb / nb : null); out.t.push(tOf(b1));
+    }
+    return out;
+  }
+  function segs(arr) {
+    var out = [], cur = [];
+    arr.forEach(function (v, i) { if (v == null) { if (cur.length) out.push(cur); cur = []; } else cur.push(i); });
+    if (cur.length) out.push(cur);
+    return out;
+  }
+  function line(arr, sg) { return sg.map(function (i, j) { return (j ? 'L' : 'M') + X(i).toFixed(1) + ' ' + Y(arr[i]).toFixed(1); }).join(''); }
+  function pathOf(arr) { return segs(arr).map(function (sg) { return line(arr, sg); }).join(''); }
+  function areaOf(arr) {
+    return segs(arr).filter(function (sg) { return sg.length > 1; }).map(function (sg) {
+      return line(arr, sg) + 'L' + X(sg[sg.length - 1]).toFixed(1) + ' ' + Y(0) + 'L' + X(sg[0]).toFixed(1) + ' ' + Y(0) + 'Z';
+    }).join('');
+  }
+  function fmtTick(t) { return range === '7d' ? fmtDay(t) : fmtHM(t); }
+  function fmtTip(t) { return range === '7d' ? fmtDay(t) + ' · ' + fmtHM(t) : fmtHM(t); }
+
+  function renderChart() {
+    if (!D) return;
+    S = series(); NPT = S.t.length;
+    var mx = 0;
+    S.A.concat(S.B).forEach(function (v) { if (v != null && v > mx) mx = v; });
+    var steps = [0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.4, 0.5], step = 0.5;
+    for (var q = 0; q < steps.length; q++) if (steps[q] * 4 >= mx * 1.15) { step = steps[q]; break; }
+    YM = step * 4;
+    while (axes.firstChild) axes.removeChild(axes.firstChild);
+    for (var v = 0; v <= 4; v++) {
+      var y = Y(step * v);
+      el('line', { 'class': v === 0 ? 'gl gl0' : 'gl', x1: ML, x2: CW - MR, y1: y, y2: y }, axes);
+      el('text', { x: ML - 8, y: y + 3.5, 'text-anchor': 'end' }, axes, (step * v).toFixed(2));
+    }
+    var sel = state.sel;
+    var top = sel === 'A' ? lnA : lnB, low = sel === 'A' ? lnB : lnA;
+    lnA.setAttribute('d', pathOf(S.A));
+    lnB.setAttribute('d', pathOf(S.B));
+    top.setAttribute('stroke-width', 2.2); top.setAttribute('opacity', 1);
+    low.setAttribute('stroke-width', 1.5); low.setAttribute('opacity', .5);
+    svg.appendChild(low); svg.appendChild(top); svg.appendChild(guide); svg.appendChild(dB); svg.appendChild(dA);
+    area.setAttribute('fill', 'url(#gr' + sel + ')');
+    area.setAttribute('d', areaOf(S[sel]));
+    while (xl.firstChild) xl.removeChild(xl.firstChild);
+    [0, .25, .5, .75, 1].forEach(function (f, j) {
+      var i = Math.round(f * (NPT - 1));
+      el('text', { x: X(i), y: CH - 7, 'text-anchor': j === 0 ? 'start' : j === 4 ? 'end' : 'middle' }, xl, fmtTick(S.t[i]));
+    });
+    var i = hover >= 0 && hover < NPT ? hover : NPT - 1;
+    [[dA, S.A[i]], [dB, S.B[i]]].forEach(function (p) {
+      p[0].setAttribute('r', p[1] == null ? 0 : 3.5);
+      if (p[1] != null) { p[0].setAttribute('cx', X(i)); p[0].setAttribute('cy', Y(p[1])); }
+    });
+    $('rangeNote').textContent = RANGE_NOTE[range];
+    if (hover >= 0) renderTip(i);
+  }
+  function cell(v) { return v == null ? '<b class="na">ขาดสัญญาณ</b>' : '<b>' + v.toFixed(2) + ' m</b>'; }
+  function renderTip(i) {
+    var tip = $('tip'), wrap = $('chartwrap'), r = redOf(S.A[i], S.B[i]);
+    tip.innerHTML = '<div class="t">' + fmtTip(S.t[i]) + '</div>' +
+      '<div><span><i style="background:' + COLORS.A + '"></i>Buoy A</span>' + cell(S.A[i]) + '</div>' +
+      '<div><span><i style="background:' + COLORS.B + '"></i>Buoy B</span>' + cell(S.B[i]) + '</div>' +
+      '<div><span>ลดลง</span><b>' + (r == null ? '–' : r.toFixed(1) + ' %') + '</b></div>';
+    tip.hidden = false;
+    var w = wrap.clientWidth, px = X(i) / CW * w, tw = tip.offsetWidth;
+    tip.style.left = clamp(px > w / 2 ? px - tw - 12 : px + 12, 0, Math.max(0, w - tw)) + 'px';
+    guide.setAttribute('x1', X(i)); guide.setAttribute('x2', X(i)); guide.setAttribute('visibility', 'visible');
+  }
+  svg.addEventListener('pointermove', function (e) {
+    if (!D) return;
+    var r = svg.getBoundingClientRect();
+    var vx = (e.clientX - r.left) / r.width * CW;
+    hover = clamp(Math.round((vx - ML) / (CW - ML - MR) * (NPT - 1)), 0, NPT - 1);
+    renderChart();
+  });
+  svg.addEventListener('pointerleave', function () {
+    hover = -1; $('tip').hidden = true; guide.setAttribute('visibility', 'hidden'); renderChart();
+  });
+
+  /* ---------------- Panel ---------------- */
+  var GC = 2 * Math.PI * 50;
+  function renderPanel() {
+    if (!D) return;
+    var i = cursor, sel = state.sel, s = val(sel, i);
+    $('selTitle').textContent = sel === 'A' ? 'Buoy A · ก่อนแผงกันคลื่น' : 'Buoy B · หลังแผงกันคลื่น';
+    $('tabA').setAttribute('aria-pressed', sel === 'A');
+    $('tabB').setAttribute('aria-pressed', sel === 'B');
+    $('ago').textContent = 'เวลาเซนเซอร์ ' + fmtHM(tOf(i)) + ' · ลม ' + D.wind[i].toFixed(1) + ' m/s';
+    var mx = 0;
+    for (var j = Math.max(0, i - 1439); j <= i; j++) { var h = D[sel].h[j]; if (h != null && h > mx) mx = h; }
+    $('mHs').textContent = 'สูงสุด 24 ชม. ' + mx.toFixed(2) + ' m';
+    var st = $('mS');
+    if (s) {
+      $('mH').textContent = s.h.toFixed(2);
+      $('mP').textContent = s.p.toFixed(2);
+      $('mPs').textContent = 'ความยาวคลื่น ≈ ' + (1.56 * s.p * s.p).toFixed(1) + ' m';
+      $('mT').textContent = s.c.toFixed(1);
+      st.textContent = 'ONLINE'; st.classList.remove('off');
+      $('mSs').textContent = 'ส่งข้อมูลทุก 1 นาที';
+    } else {
+      $('mH').textContent = '–'; $('mP').textContent = '–'; $('mT').textContent = '–';
+      $('mPs').textContent = 'ไม่มีข้อมูล';
+      st.textContent = 'OFFLINE'; st.classList.add('off');
+      var k0 = i; while (k0 > 0 && D[sel].h[k0 - 1] == null) k0--;
+      $('mSs').textContent = 'ขาดสัญญาณตั้งแต่ ' + fmtHM(tOf(k0));
+    }
+    var r = red(i), gf = $('gFill'), g = $('grade');
+    var a = D.A.h[i], b = D.B.h[i];
+    $('rA').textContent = a == null ? 'OFFLINE' : a.toFixed(2) + ' m';
+    $('rB').textContent = b == null ? 'OFFLINE' : b.toFixed(2) + ' m';
+    if (r == null) {
+      $('wr').textContent = '–';
+      gf.setAttribute('stroke-dashoffset', GC.toFixed(2));
+      g.className = 'grade none'; g.textContent = 'ไม่มีข้อมูล';
+    } else {
+      $('wr').textContent = r.toFixed(1);
+      gf.setAttribute('stroke-dashoffset', (GC * (1 - Math.min(r, 100) / 100)).toFixed(2));
+      var cls = r >= 70 ? 'good' : r >= 40 ? 'warn' : 'bad';
+      g.className = 'grade ' + cls;
+      g.textContent = cls === 'good' ? 'ลดได้ดี' : cls === 'warn' ? 'ลดได้ปานกลาง' : 'ลดได้น้อย';
+      gf.style.stroke = 'var(--' + cls + ')';
+    }
+    renderChart();
+    if (gl) gl.sync();
+  }
+
+  function select(id) { state.sel = id; renderPanel(); }
+  $('tabA').addEventListener('click', function () { select('A'); });
+  $('tabB').addEventListener('click', function () { select('B'); });
+  function setSpeed(v) {
+    speed = v;
+    [1, 30, 300].forEach(function (x) { $('sp' + x).setAttribute('aria-pressed', x === v); });
+    if (v === 1 && D) syncNow();
+  }
+  [1, 30, 300].forEach(function (x) { $('sp' + x).addEventListener('click', function () { setSpeed(x); }); });
+  function setRange(v) {
+    range = v; hover = -1; $('tip').hidden = true; guide.setAttribute('visibility', 'hidden');
+    ['live', '24h', '7d'].forEach(function (x) { $('rg-' + x).setAttribute('aria-pressed', x === v); });
+    renderChart();
+  }
+  ['live', '24h', '7d'].forEach(function (x) { $('rg-' + x).addEventListener('click', function () { setRange(x); }); });
+
+  /* ---------------- 3D twin ---------------- */
+  var gl = null;
+  try {
+    if (!window.THREE || !THREE.OrbitControls) throw new Error('three');
+    gl = initGL();
+  } catch (err) {
+    $('glfail').hidden = false;
+    $('gl').style.display = 'none';
+  }
+
+  function initGL() {
+    var host = $('scene'), canvas = $('gl');
+    var renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    renderer.outputEncoding = THREE.sRGBEncoding;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.05;
+
+    var BG = 0x07131B;
+    var scene = new THREE.Scene();
+    scene.background = new THREE.Color(BG);
+    scene.fog = new THREE.Fog(BG, 110, 235);
+    var camera = new THREE.PerspectiveCamera(40, 1, 0.5, 900);
+    var controls = new THREE.OrbitControls(camera, canvas);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.08;
+    controls.maxPolarAngle = Math.PI * 0.485;
+    controls.minDistance = 20;
+    controls.maxDistance = 280;
+    controls.screenSpacePanning = true;
+
+    scene.add(new THREE.HemisphereLight(0xcfeeff, 0x0b2230, 0.65));
+    var sun = new THREE.DirectionalLight(0xfff1dc, 1.3); sun.position.set(-50, 90, 60); scene.add(sun);
+    var rim = new THREE.DirectionalLight(0x6fd3ff, 0.4); rim.position.set(70, 40, -90); scene.add(rim);
+
+    /* Layout traced from the original plan view (1 unit = 10 px of the original map; north/up = −z). */
+    var RAFTS = [{ x: -10.6, z: -42 }, { x: -10.6, z: -21 }, { x: -10.6, z: 0 }, { x: 10.4, z: 0 }];
+    var RW = 18, RD = 17.8;
+    var BW = { x: -16.4, z: 21.0, w: 6.4, d: 2.2 };
+    var BUOY = { A: { x: -15.9, z: 26.6 }, B: { x: -15.9, z: 13.4 } };
+    var TARGET = new THREE.Vector3(-4, 0, -10);
+
+    /* Breakwater sheltering: full effect at Buoy B, spreading and fading behind the breakwater */
+    function rawShelter(x, z) {
+      var d = BW.z + 1.1 - z; if (d <= 0) return 0;
+      var behind = Math.max(0, BW.z - z);
+      var s = 2.4 + 0.3 * behind;
+      return Math.exp(-((x - BW.x) * (x - BW.x)) / (2 * s * s)) * Math.min(1, d / 2.2) * Math.exp(-behind / 70);
+    }
+    var rawB = rawShelter(BUOY.B.x, BUOY.B.z);
+    function shelter(x, z) { return Math.min(1, rawShelter(x, z) / rawB); }
+
+    var ph0 = 0, ph1 = 0, ph2 = 0;
+    var K0 = 2 * Math.PI / 18, K1 = 2 * Math.PI / 11, K2 = 2 * Math.PI / 7;
+    function eta(x, z) {
+      return 0.55 * Math.sin(K0 * z + 0.05 * x + ph0) +
+             0.30 * Math.sin(K1 * (0.94 * z - 0.34 * x) + ph1 + 1.3) +
+             0.15 * Math.sin(K2 * (0.90 * z + 0.43 * x) + ph2 + 2.1);
+    }
+    var amp = 0.4, ampT = 0.4, R = 0.8, RT = 0.8, Tv = 3, lastA = null;
+    function height(x, z) { return amp * (1 - R * shelter(x, z)) * eta(x, z); }
+
+    /* Water */
+    var SIZE = 260, SEG = 170;
+    var wgeo = new THREE.PlaneGeometry(SIZE, SIZE, SEG, SEG);
+    wgeo.rotateX(-Math.PI / 2);
+    var wpos = wgeo.attributes.position, wa = wpos.array, nv = wpos.count;
+    var bx = new Float32Array(nv), bz = new Float32Array(nv), G = new Float32Array(nv);
+    for (var i = 0; i < nv; i++) { bx[i] = wa[i * 3]; bz[i] = wa[i * 3 + 2]; G[i] = shelter(bx[i], bz[i]); }
+    var wcol = new Float32Array(nv * 3);
+    wgeo.setAttribute('color', new THREE.BufferAttribute(wcol, 3));
+    var deep = new THREE.Color(0x041E2B).convertSRGBToLinear();
+    var crest = new THREE.Color(0x1A7893).convertSRGBToLinear();
+    var calm = new THREE.Color(0x0E5468).convertSRGBToLinear();
+    var water = new THREE.Mesh(wgeo, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.2, metalness: 0.15 }));
+    scene.add(water);
+
+    /* PV panel texture */
+    function panelTexture() {
+      var c = document.createElement('canvas'); c.width = 256; c.height = 176;
+      var x = c.getContext('2d');
+      x.fillStyle = '#C9D3D9'; x.fillRect(0, 0, 256, 176);
+      x.fillStyle = '#0A1D4A'; x.fillRect(6, 6, 244, 164);
+      var cols = 6, rows = 10, cw = 244 / cols, ch = 164 / rows;
+      for (var r = 0; r < rows; r++) for (var q = 0; q < cols; q++) {
+        x.fillStyle = (r + q) % 2 ? '#183F92' : '#173B8A';
+        x.fillRect(6 + q * cw + 1.2, 6 + r * ch + 1.2, cw - 2.4, ch - 2.4);
+      }
+      var g = x.createLinearGradient(0, 0, 256, 176);
+      g.addColorStop(0, 'rgba(255,255,255,.16)'); g.addColorStop(.45, 'rgba(255,255,255,0)'); g.addColorStop(1, 'rgba(255,255,255,.06)');
+      x.fillStyle = g; x.fillRect(6, 6, 244, 164);
+      var t = new THREE.CanvasTexture(c);
+      t.encoding = THREE.sRGBEncoding;
+      t.anisotropy = renderer.capabilities.getMaxAnisotropy();
+      return t;
+    }
+    var panelMat = new THREE.MeshStandardMaterial({ map: panelTexture(), metalness: 0.5, roughness: 0.24 });
+    var panelGeo = new THREE.BoxGeometry(2.45, 0.07, 1.7);
+    var floatMat = new THREE.MeshStandardMaterial({ color: 0xE3E9EB, roughness: 0.75 });
+    var walkMat = new THREE.MeshStandardMaterial({ color: 0xB9C5CA, roughness: 0.85 });
+
+    var floaters = [];
+    RAFTS.forEach(function (p, idx) {
+      var g = new THREE.Group();
+      var base = new THREE.Mesh(new THREE.BoxGeometry(RW, 0.9, RD), floatMat); base.position.y = 0.05; g.add(base);
+      var inst = new THREE.InstancedMesh(panelGeo, panelMat, 48);
+      var m = new THREE.Matrix4(), q = new THREE.Quaternion().setFromEuler(new THREE.Euler(-0.21, 0, 0)), sc = new THREE.Vector3(1, 1, 1);
+      var n = 0, sx = -(6 * 2.45 + 5 * 0.12) / 2 + 1.225, sz = -(8 * 1.7 + 7 * 0.32) / 2 + 0.85;
+      for (var r = 0; r < 8; r++) {
+        for (var c = 0; c < 6; c++) { m.compose(new THREE.Vector3(sx + c * 2.57, 0.82, sz + r * 2.02), q, sc); inst.setMatrixAt(n++, m); }
+        if (r < 7) { var w = new THREE.Mesh(new THREE.BoxGeometry(15.4, 0.06, 0.26), walkMat); w.position.set(0, 0.53, sz + r * 2.02 + 1.01); g.add(w); }
+      }
+      g.add(inst);
+      g.position.set(p.x, 0, p.z);
+      scene.add(g);
+      floaters.push({ obj: g, x: p.x, z: p.z, hw: RW / 2, hd: RD / 2, y: 0.05, k: 0.6 });
+    });
+
+    /* Breakwater: four floating modules */
+    var bwg = new THREE.Group();
+    var bwMat = new THREE.MeshStandardMaterial({ color: new THREE.Color(0xF29A2B).convertSRGBToLinear(), roughness: 0.5 });
+    var bwDark = new THREE.MeshStandardMaterial({ color: 0x8A4D12, roughness: 0.7 });
+    for (var b = 0; b < 4; b++) {
+      var mod = new THREE.Mesh(new THREE.BoxGeometry(1.5, 1.05, BW.d), bwMat);
+      mod.position.set(-2.4 + b * 1.6, 0.15, 0); bwg.add(mod);
+    }
+    var tie = new THREE.Mesh(new THREE.BoxGeometry(BW.w, 0.12, 0.28), bwDark); tie.position.set(0, 0.72, 0); bwg.add(tie);
+    bwg.position.set(BW.x, 0, BW.z);
+    scene.add(bwg);
+    floaters.push({ obj: bwg, x: BW.x, z: BW.z, hw: BW.w / 2, hd: BW.d / 2, y: 0, k: 0.85 });
+
+    /* Buoys */
+    var hits = [], buoys = {};
+    function makeBuoy(id, color) {
+      var g = new THREE.Group();
+      var body = new THREE.Mesh(new THREE.SphereGeometry(1.45, 32, 20), new THREE.MeshStandardMaterial({ color: new THREE.Color(color).convertSRGBToLinear(), roughness: 0.4, emissive: new THREE.Color(color).convertSRGBToLinear(), emissiveIntensity: 0.18 }));
+      body.scale.y = 0.85; body.position.y = 0.35; g.add(body);
+      var collar = new THREE.Mesh(new THREE.TorusGeometry(1.42, 0.17, 12, 36), new THREE.MeshStandardMaterial({ color: 0x23323B, roughness: 0.6 }));
+      collar.rotation.x = Math.PI / 2; collar.position.y = 0.35; g.add(collar);
+      var mast = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.12, 2.6, 10), new THREE.MeshStandardMaterial({ color: 0x31434D, roughness: 0.5, metalness: 0.4 }));
+      mast.position.y = 1.95; g.add(mast);
+      var lamp = new THREE.Mesh(new THREE.SphereGeometry(0.3, 16, 12), new THREE.MeshBasicMaterial({ color: new THREE.Color(color).convertSRGBToLinear() }));
+      lamp.position.y = 3.35; g.add(lamp);
+      var hit = new THREE.Mesh(new THREE.SphereGeometry(3.4, 12, 8), new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false }));
+      hit.position.y = 1.4; hit.userData.id = id; g.add(hit); hits.push(hit);
+      var p = BUOY[id];
+      g.position.set(p.x, 0, p.z);
+      scene.add(g);
+      var ring = new THREE.Mesh(new THREE.RingGeometry(2.2, 2.55, 64), new THREE.MeshBasicMaterial({ color: 0x56D6F5, transparent: true, opacity: 0.9, side: THREE.DoubleSide, depthWrite: false }));
+      ring.rotation.x = -Math.PI / 2; scene.add(ring);
+      var pulse = new THREE.Mesh(new THREE.RingGeometry(2.2, 2.4, 64), new THREE.MeshBasicMaterial({ color: 0x56D6F5, transparent: true, opacity: 0.5, side: THREE.DoubleSide, depthWrite: false }));
+      pulse.rotation.x = -Math.PI / 2; scene.add(pulse);
+      buoys[id] = { g: g, lamp: lamp, ring: ring, pulse: pulse };
+      floaters.push({ obj: g, x: p.x, z: p.z, hw: 1, hd: 1, y: 0, k: 1 });
+    }
+    makeBuoy('A', 0xFFCB3D);
+    makeBuoy('B', 0xFF8A3A);
+
+    /* Wave direction arrow on the water */
+    var sh = new THREE.Shape();
+    sh.moveTo(-0.9, -5); sh.lineTo(0.9, -5); sh.lineTo(0.9, 1.4); sh.lineTo(2.6, 1.4); sh.lineTo(0, 5); sh.lineTo(-2.6, 1.4); sh.lineTo(-0.9, 1.4); sh.closePath();
+    var arrow = new THREE.Mesh(new THREE.ShapeGeometry(sh), new THREE.MeshBasicMaterial({ color: 0xE7F2F6, transparent: true, opacity: 0.6, side: THREE.DoubleSide, depthWrite: false }));
+    arrow.rotation.x = -Math.PI / 2;
+    arrow.position.set(-32, 2.2, 28);
+    scene.add(arrow);
+
+    /* HTML labels pinned to 3D anchors */
+    var layer = $('labels'), labels = [];
+    function addLabel(html, cls, x, y, z, follow) {
+      var d = document.createElement('div');
+      d.className = 'lbl ' + (cls || '');
+      d.innerHTML = html;
+      layer.appendChild(d);
+      var L = { el: d, v: new THREE.Vector3(x, y, z), y: y, follow: follow };
+      labels.push(L);
+      return L;
+    }
+    RAFTS.forEach(function (p, i) { var e = i === 3 ? 1 : -1; addLabel('แพ ' + (i + 1), 'soft', p.x + e * (RW / 2 + 3), 1.6, p.z, floaters[i]); });
+    addLabel('แผงกันคลื่น', '', BW.x + 8.5, 0.6, BW.z + 1, floaters[4]);
+    addLabel('↑ ทิศทางคลื่น', 'arrow soft', -32, 2.4, 35);
+    var lblA = addLabel('<i style="background:#FFCB3D">A</i><span class="lt">ก่อนแผง</span><b id="lvA">0.00 m</b>', 'buoy', BUOY.A.x, 6.6, BUOY.A.z, floaters[5]);
+    var lblB = addLabel('<i style="background:#FF8A3A">B</i><span class="lt">หลังแผง</span><b id="lvB">0.00 m</b>', 'buoy', BUOY.B.x, 6.6, BUOY.B.z, floaters[6]);
+    lblA.el.addEventListener('click', function () { select('A'); });
+    lblB.el.addEventListener('click', function () { select('B'); });
+
+    /* Picking */
+    var ray = new THREE.Raycaster(), ptr = new THREE.Vector2(), down = null;
+    function pick(e) {
+      var r = canvas.getBoundingClientRect();
+      ptr.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
+      ray.setFromCamera(ptr, camera);
+      var hit = ray.intersectObjects(hits, false)[0];
+      return hit ? hit.object.userData.id : null;
+    }
+    canvas.addEventListener('pointerdown', function (e) { down = [e.clientX, e.clientY]; });
+    canvas.addEventListener('pointerup', function (e) {
+      if (!down) return;
+      var moved = Math.hypot(e.clientX - down[0], e.clientY - down[1]); down = null;
+      if (moved < 6) { var id = pick(e); if (id) select(id); }
+    });
+    canvas.addEventListener('pointermove', function (e) {
+      if (e.buttons) return;
+      canvas.style.cursor = pick(e) ? 'pointer' : '';
+    });
+
+    /* Camera presets */
+    var tween = null, W = 1, H = 1;
+    function viewPose(name) {
+      var aspect = W / H, tgt = TARGET.clone(), pos;
+      var tan = Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
+      if (name === 'top') {
+        var d = Math.max(47 / tan, 32 / (tan * aspect)) * 1.04;
+        pos = tgt.clone().add(new THREE.Vector3(0, d, 0.001));
+      } else if (name === 'side') {
+        tgt = new THREE.Vector3(-12, 0, 8);
+        pos = tgt.clone().add(new THREE.Vector3(26, 6, 40).multiplyScalar(aspect < 1 ? 1.5 : 1));
+      } else {
+        var f = aspect < 1 ? Math.pow(1 / aspect, 0.75) : 1;
+        if (aspect < 1) tgt = new THREE.Vector3(-9, 0, -8);
+        pos = tgt.clone().add(new THREE.Vector3(58, 64, 92).multiplyScalar(f * (aspect > 1.9 ? 0.92 : 1)));
+      }
+      return { pos: pos, tgt: tgt };
+    }
+    var view = '3d';
+    function goView(name, instant) {
+      view = name;
+      $('v3d').setAttribute('aria-pressed', name === '3d');
+      $('vtop').setAttribute('aria-pressed', name === 'top');
+      $('vside').setAttribute('aria-pressed', name === 'side');
+      var p = viewPose(name);
+      if (instant || reduced) { camera.position.copy(p.pos); controls.target.copy(p.tgt); controls.update(); tween = null; return; }
+      tween = { p0: camera.position.clone(), t0: controls.target.clone(), p1: p.pos, t1: p.tgt, s: performance.now(), d: 900 };
+    }
+    $('v3d').addEventListener('click', function () { goView('3d'); });
+    $('vtop').addEventListener('click', function () { goView('top'); });
+    $('vside').addEventListener('click', function () { goView('side'); });
+    controls.addEventListener('start', function () { tween = null; });
+
+    function resize() {
+      var r = host.getBoundingClientRect();
+      W = Math.max(1, r.width); H = Math.max(1, r.height);
+      renderer.setSize(W, H, false);
+      camera.aspect = W / H;
+      camera.updateProjectionMatrix();
+    }
+    resize();
+    goView('3d', true);
+    if (window.ResizeObserver) new ResizeObserver(resize).observe(host);
+    else window.addEventListener('resize', resize);
+
+    /* Frame loop */
+    var v = new THREE.Vector3(), last = performance.now();
+    function frame(now) {
+      var dt = Math.min(0.05, (now - last) / 1000); last = now;
+      var sp = reduced ? 0.25 : 1;
+      var w = 2 * Math.PI / Tv;
+      ph0 += w * dt * sp; ph1 += w * 1.22 * dt * sp; ph2 += w * 1.55 * dt * sp;
+      amp += (ampT - amp) * Math.min(1, dt * 1.2);
+      R += (RT - R) * Math.min(1, dt * 1.2);
+
+      var ref = Math.max(amp, 0.2);
+      for (var i = 0; i < nv; i++) {
+        var f = 1 - R * G[i];
+        var y = amp * f * eta(bx[i], bz[i]);
+        wa[i * 3 + 1] = y;
+        var t = clamp(0.5 + y / (2 * ref), 0, 1) * (0.35 + 0.65 * f);
+        var j = i * 3, mixC = 1 - f;
+        wcol[j] = deep.r + (crest.r - deep.r) * t + (calm.r - deep.r) * mixC * 0.4;
+        wcol[j + 1] = deep.g + (crest.g - deep.g) * t + (calm.g - deep.g) * mixC * 0.4;
+        wcol[j + 2] = deep.b + (crest.b - deep.b) * t + (calm.b - deep.b) * mixC * 0.4;
+      }
+      wpos.needsUpdate = true;
+      wgeo.attributes.color.needsUpdate = true;
+      wgeo.computeVertexNormals();
+
+      floaters.forEach(function (o) {
+        var hc = height(o.x, o.z);
+        var sx = (height(o.x + o.hw, o.z) - height(o.x - o.hw, o.z)) / (2 * o.hw);
+        var sz = (height(o.x, o.z + o.hd) - height(o.x, o.z - o.hd)) / (2 * o.hd);
+        o.obj.position.y = o.y + hc * o.k;
+        o.obj.rotation.z = Math.atan(sx) * o.k;
+        o.obj.rotation.x = -Math.atan(sz) * o.k;
+      });
+
+      ['A', 'B'].forEach(function (id) {
+        var bb = buoys[id], on = state.sel === id, p = BUOY[id];
+        var y = height(p.x, p.z) + 0.12;
+        bb.ring.position.set(p.x, y, p.z); bb.ring.visible = on;
+        var ph = ((now / 1600) % 1);
+        bb.pulse.position.set(p.x, y, p.z); bb.pulse.visible = on && !reduced;
+        bb.pulse.scale.setScalar(1 + ph * 1.6);
+        bb.pulse.material.opacity = 0.55 * (1 - ph);
+        bb.lamp.visible = !bb.off && (reduced || (now / 1000 + (id === 'A' ? 0 : 0.5)) % 1.4 < 0.9);
+      });
+
+      if (tween) {
+        var e = Math.min(1, (now - tween.s) / tween.d);
+        var q = e < 0.5 ? 4 * e * e * e : 1 - Math.pow(-2 * e + 2, 3) / 2;
+        camera.position.lerpVectors(tween.p0, tween.p1, q);
+        controls.target.lerpVectors(tween.t0, tween.t1, q);
+        if (e >= 1) tween = null;
+      }
+      controls.update();
+
+      for (var l = 0; l < labels.length; l++) {
+        var L = labels[l];
+        v.copy(L.v);
+        if (L.follow) v.y = L.y + L.follow.obj.position.y;
+        v.project(camera);
+        if (v.z > 1 || v.x < -1.2 || v.x > 1.2 || v.y < -1.2 || v.y > 1.2) { L.el.style.visibility = 'hidden'; continue; }
+        L.el.style.visibility = 'visible';
+        L.el.style.transform = 'translate(' + ((v.x * 0.5 + 0.5) * W).toFixed(1) + 'px,' + ((-v.y * 0.5 + 0.5) * H).toFixed(1) + 'px) translate(-50%,-100%)';
+      }
+
+      renderer.render(scene, camera);
+      requestAnimationFrame(frame);
+    }
+    requestAnimationFrame(frame);
+
+    return {
+      sync: function () {
+        var a = val('A', cursor), b = val('B', cursor), r = red(cursor);
+        if (a) lastA = a;
+        var h = lastA ? lastA.h : 0.15;
+        ampT = clamp(0.18 + h * 2.0, 0.18, 1.2);
+        if (r != null) RT = clamp(r / 100, 0, 0.98);
+        Tv = clamp((lastA ? lastA.p : 1.8) * 1.7, 2.2, 5);
+        buoys.A.off = !a; buoys.B.off = !b;
+        $('lvA').textContent = a ? a.h.toFixed(2) + ' m' : 'OFFLINE';
+        $('lvB').textContent = b ? b.h.toFixed(2) + ' m' : 'OFFLINE';
+        lblA.el.classList.toggle('sel', state.sel === 'A');
+        lblB.el.classList.toggle('sel', state.sel === 'B');
+      }
+    };
+  }
+
+  /* ---------------- Playback loop ---------------- */
+  function tick() {
+    if (!D) return;
+    cursorF += 2 * speed / 60;
+    var c = Math.floor(cursorF);
+    if (c >= D.n) { cursorF = 90; c = 90; }
+    if (c !== cursor) { cursor = c; renderPanel(); }
+  }
+  fetch('demo-data.json').then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); })
+    .then(useData).catch(function () { useData(fallbackData()); });
+  tickClock();
+  setInterval(tick, 2000);
+  setInterval(tickClock, 1000);
+})();
+</script>
+
+</body>
+</html>
