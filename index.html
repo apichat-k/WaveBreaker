@@ -695,9 +695,10 @@ button { font: inherit; color: inherit; }
       '  float sd = max(dot(Rf, uSun), 0.0);',
       '  col += uSunCol * (pow(sd, 900.0) * 7.0 + pow(sd, 90.0) * 0.3);',
       '  float fn = noise(q * 0.9 + uTime * 0.12) * noise(q * 2.4 - uTime * 0.18);',
-      '  float crest = smoothstep(0.62, 1.05, vH) * smoothstep(0.12, 0.38, fn);',
-      '  float ring = (1.0 - smoothstep(0.0, 1.8, vEdge)) * smoothstep(0.05, 0.3, fn + 0.08);',
-      '  col = mix(col, vec3(0.88, 0.93, 0.95), clamp(crest * 0.75 + ring * 0.8, 0.0, 1.0));',
+      '  float crest = smoothstep(0.7, 1.1, vH) * smoothstep(0.18, 0.42, fn);',
+      '  float ring = (1.0 - smoothstep(0.0, 0.7, vEdge)) * smoothstep(0.22, 0.42, fn);',
+      '  col *= mix(0.62, 1.0, smoothstep(0.0, 3.0, vEdge));',
+      '  col = mix(col, vec3(0.62, 0.70, 0.72), clamp(crest * 0.45 + ring * 0.3, 0.0, 1.0));',
       '  col = mix(col, uFogCol, smoothstep(uFogNear, uFogFar, length(cameraPosition - vWorld)));',
       '  gl_FragColor = vec4(col, 1.0);',
       '#include <tonemapping_fragment>',
@@ -728,10 +729,10 @@ button { font: inherit; color: inherit; }
       t.anisotropy = renderer.capabilities.getMaxAnisotropy();
       return t;
     }
-    var panelMat = new THREE.MeshStandardMaterial({ map: panelTexture(), color: lin(0xC8D2E6), metalness: 0.25, roughness: 0.38 });
+    var panelMat = new THREE.MeshStandardMaterial({ map: panelTexture(), color: lin(0x8F9CBC), metalness: 0.05, roughness: 0.62 });
     var panelGeo = new THREE.BoxGeometry(2.45, 0.07, 1.7);
-    var floatMat = new THREE.MeshStandardMaterial({ color: lin(0xE3E9EB), roughness: 0.75 });
-    var walkMat = new THREE.MeshStandardMaterial({ color: lin(0xB9C5CA), roughness: 0.85 });
+    var floatMat = new THREE.MeshStandardMaterial({ color: lin(0x8E999E), roughness: 0.92 });
+    var walkMat = new THREE.MeshStandardMaterial({ color: lin(0x6F7A80), roughness: 0.95 });
 
     var floaters = [];
     RAFTS.forEach(function (p) {
