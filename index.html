@@ -71,7 +71,7 @@ button { font: inherit; color: inherit; }
 .main { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) 430px; gap: 14px; }
 
 /* 3D scene */
-.scene { position: relative; min-width: 0; min-height: 0; border-radius: 18px; overflow: hidden; border: 1px solid var(--line); background: #07131B; isolation: isolate; }
+.scene { position: relative; min-width: 0; min-height: 0; border-radius: 18px; overflow: hidden; border: 1px solid var(--line); background: #8FAFC2; isolation: isolate; }
 #gl { display: block; width: 100%; height: 100%; touch-action: none; cursor: grab; }
 #gl:active { cursor: grabbing; }
 .labels { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
@@ -90,7 +90,7 @@ button { font: inherit; color: inherit; }
 .legend { position: absolute; left: 12px; bottom: 12px; display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: center; padding: 8px 12px; border-radius: 12px; background: var(--glass); border: 1px solid rgba(255,255,255,.08); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); font-size: 12px; font-family: var(--thai); color: var(--muted); max-width: calc(100% - 24px); }
 .legend span { display: inline-flex; align-items: center; gap: 7px; }
 .legend i { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
-.hint { position: absolute; right: 12px; bottom: 12px; font-size: 11.5px; color: var(--dim); font-family: var(--thai); padding: 6px 10px; }
+.hint { position: absolute; right: 12px; bottom: 12px; font-size: 11.5px; color: rgba(231, 242, 246, .85); text-shadow: 0 1px 3px rgba(0, 0, 0, .5); font-family: var(--thai); padding: 6px 10px; }
 .glfail { position: absolute; inset: 0; display: grid; place-items: center; padding: 24px; text-align: center; color: var(--muted); font-family: var(--thai); }
 
 /* Sensor column */
@@ -258,13 +258,13 @@ button { font: inherit; color: inherit; }
           <div class="num"><b><span id="wr">0.0</span><small>%</small></b></div>
         </div>
         <div class="reduce-body">
-          <div class="reduce-top"><h3 id="wrT">Wave Reduction</h3><span class="grade good" id="grade">–</span></div>
+          <div class="reduce-top"><h3 id="wrT">Wave Energy Reduction</h3><span class="grade good" id="grade">–</span></div>
           <div class="flow">
             <span class="pt"><i style="background:var(--a)"></i><span id="rA">0.00 m</span></span>
             <span class="to">→</span>
             <span class="pt"><i style="background:var(--b)"></i><span id="rB">0.00 m</span></span>
           </div>
-          <p>ความสูงคลื่นที่ลดลงหลังผ่านแผงกันคลื่น คำนวณจาก 1 − H<sub>B</sub>/H<sub>A</sub></p>
+          <p>พลังงานคลื่นที่ลดลงหลังผ่านแผงกันคลื่น 1 − (H<sub>B</sub>/H<sub>A</sub>)² · ความสูงคลื่นลดลง <b id="hr">–</b></p>
         </div>
       </section>
 
@@ -284,7 +284,7 @@ button { font: inherit; color: inherit; }
         <div class="chart-foot"><div class="clegend"><span><i style="background:var(--a)"></i>Buoy A</span><span><i style="background:var(--b)"></i>Buoy B</span><span>m</span></div><span id="rangeNote"></span></div>
       </section>
 
-      <p class="note">ข้อมูลจำลอง 7 วัน บันทึกทุก 1 นาที สร้างจากแบบจำลองลม → คลื่นแบบ fetch-limited (fetch 6 km) และสัมประสิทธิ์การส่งผ่านคลื่นของ Macagno (แผงกว้าง 4 m กินน้ำ 0.8 m ความลึกน้ำ 10 m) มีเหตุการณ์พายุฝนฟ้าคะนองในวันที่ 5 และ Buoy B ขาดสัญญาณ 45 นาทีในวันที่ 4 วันที่ถูกเลื่อนให้วันสุดท้ายตรงกับวันนี้</p>
+      <p class="note">ข้อมูลจำลอง 7 วัน บันทึกทุก 1 นาที คลื่นก่อนแผงกันคลื่น (Hs) 1.0–1.5 m คาบคลื่นคำนวณจากความชันคลื่น 1/27 และการลดพลังงานคลื่น 30–50% ตามแนวโน้มของ Macagno (คลื่นยิ่งยาว แผงยิ่งลดได้น้อย) มีพายุฝนฟ้าคะนองในวันที่ 5 และ Buoy B ขาดสัญญาณ 45 นาทีในวันที่ 4 วันที่ถูกเลื่อนให้วันสุดท้ายตรงกับวันนี้</p>
     </aside>
   </main>
 </div>
@@ -307,16 +307,15 @@ button { font: inherit; color: inherit; }
   /* Same physics as the published dataset, simplified; used only if demo-data.json cannot be loaded */
   function fallbackData() {
     var n = 7 * 1440, d = { start: '2026-10-12T00:00:00+07:00', interval_s: 60, count: n, wind: [], A: { h: [], p: [], c: [] }, B: { h: [], p: [], c: [] } };
-    var r = mulberry32(7), hs = 0.1, tp = 1.4, syn = [0.85, 1.05, 1.2, 0.95, 1.3, 0.8, 1];
+    var r = mulberry32(7), syn = [-0.08, 0.02, 0.1, -0.03, 0.12, -0.1, 0];
     for (var i = 0; i < n; i++) {
       var hr = (i % 1440) / 60;
-      var U = Math.max(0.6, (2.2 + 4 * Math.pow(Math.max(0, Math.sin(Math.PI * (hr - 8.5) / 13)), 1.3)) * syn[Math.floor(i / 1440)] + (r() - 0.5) * 0.8);
-      var X = G9 * 6000 / (U * U);
-      hs += 0.08 * (0.0016 * Math.sqrt(X) * U * U / G9 - hs);
-      tp += 0.08 * (0.2857 * Math.cbrt(X) * U / G9 - tp);
-      var hA = Math.max(0.03, hs * (1 + (r() - 0.5) * 0.1) + 0.02), pA = Math.max(1, tp * (1 + (r() - 0.5) * 0.07));
-      var k = 4 * Math.PI * Math.PI / (G9 * pA * pA);
-      var kt = Math.min(1, 1 / Math.sqrt(1 + Math.pow(k * 2 * Math.exp(k * 0.8), 2)) + 0.03);
+      var x = 1.24 + 0.11 * Math.max(-0.4, Math.sin(Math.PI * (hr - 9) / 12)) + syn[Math.floor(i / 1440)] + (r() - 0.5) * 0.03;
+      var hA = 1 + 0.5 / (1 + Math.exp(-(x - 1.25) / 0.12));
+      var pA = Math.sqrt(2 * Math.PI * hA * 27 / G9) * (1 + (r() - 0.5) * 0.03);
+      var U = 6.5 + (hA - 1) * 13 + (r() - 0.5) * 0.6;
+      var er = 0.3 + 0.2 / (1 + Math.exp((pA - 4.66) / 0.25));
+      var kt = Math.sqrt(1 - er);
       var tw = 29.1 - 0.09 * i / 1440 + 0.65 * Math.sin(2 * Math.PI * (hr - 9.5) / 24);
       d.wind.push(+U.toFixed(2));
       d.A.h.push(+hA.toFixed(3)); d.A.p.push(+pA.toFixed(2)); d.A.c.push(+tw.toFixed(2));
@@ -338,7 +337,7 @@ button { font: inherit; color: inherit; }
   }
   function tOf(i) { return D.t0 + i * D.dt + OFF; }
   function val(id, i) { var h = D[id].h[i]; return h == null ? null : { h: h, p: D[id].p[i], c: D[id].c[i] }; }
-  function redOf(a, b) { return (a == null || b == null || a < 0.005) ? null : Math.max(0, (1 - b / a) * 100); }
+  function redOf(a, b) { return (a == null || b == null || a < 0.005) ? null : Math.max(0, (1 - (b / a) * (b / a)) * 100); }  /* wave energy reduction, E ∝ H² */
   function red(i) { return redOf(D.A.h[i], D.B.h[i]); }
   function fmtHM(t) { return new Date(t).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: false }); }
   function fmtDay(t) { return new Date(t).toLocaleDateString('th-TH', { weekday: 'short', day: 'numeric' }); }
@@ -453,7 +452,7 @@ button { font: inherit; color: inherit; }
     tip.innerHTML = '<div class="t">' + fmtTip(S.t[i]) + '</div>' +
       '<div><span><i style="background:' + COLORS.A + '"></i>Buoy A</span>' + cell(S.A[i]) + '</div>' +
       '<div><span><i style="background:' + COLORS.B + '"></i>Buoy B</span>' + cell(S.B[i]) + '</div>' +
-      '<div><span>ลดลง</span><b>' + (r == null ? '–' : r.toFixed(1) + ' %') + '</b></div>';
+      '<div><span>ลดพลังงาน</span><b>' + (r == null ? '–' : r.toFixed(1) + ' %') + '</b></div>';
     tip.hidden = false;
     var w = wrap.clientWidth, px = X(i) / CW * w, tw = tip.offsetWidth;
     tip.style.left = clamp(px > w / 2 ? px - tw - 12 : px + 12, 0, Math.max(0, w - tw)) + 'px';
@@ -504,13 +503,14 @@ button { font: inherit; color: inherit; }
     if (r == null) {
       $('wr').textContent = '–';
       gf.setAttribute('stroke-dashoffset', GC.toFixed(2));
-      g.className = 'grade none'; g.textContent = 'ไม่มีข้อมูล';
+      g.className = 'grade none'; g.textContent = 'ไม่มีข้อมูล'; $('hr').textContent = '–';
     } else {
       $('wr').textContent = r.toFixed(1);
       gf.setAttribute('stroke-dashoffset', (GC * (1 - Math.min(r, 100) / 100)).toFixed(2));
-      var cls = r >= 70 ? 'good' : r >= 40 ? 'warn' : 'bad';
+      var cls = r >= 40 ? 'good' : r >= 30 ? 'warn' : 'bad';
       g.className = 'grade ' + cls;
-      g.textContent = cls === 'good' ? 'ลดได้ดี' : cls === 'warn' ? 'ลดได้ปานกลาง' : 'ลดได้น้อย';
+      g.textContent = cls === 'good' ? 'ลดได้ดี' : cls === 'warn' ? 'ลดได้ปานกลาง' : 'ต่ำกว่าเกณฑ์';
+      $('hr').textContent = ((1 - b / a) * 100).toFixed(1) + ' %';
       gf.style.stroke = 'var(--' + cls + ')';
     }
     renderChart();
@@ -549,13 +549,15 @@ button { font: inherit; color: inherit; }
     renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
     renderer.outputEncoding = THREE.sRGBEncoding;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 1.05;
+    renderer.toneMappingExposure = 0.95;
+    function lin(hex) { return new THREE.Color(hex).convertSRGBToLinear(); }
 
-    var BG = 0x07131B;
+    var HOR = 0xB2C8D4, TOP = 0x2D5F8C;
+    var SUN = new THREE.Vector3(-0.5, 0.33, -0.8).normalize();
     var scene = new THREE.Scene();
-    scene.background = new THREE.Color(BG);
-    scene.fog = new THREE.Fog(BG, 110, 235);
-    var camera = new THREE.PerspectiveCamera(40, 1, 0.5, 900);
+    scene.background = new THREE.Color(HOR);
+    scene.fog = new THREE.Fog(lin(HOR).getHex(), 150, 330);
+    var camera = new THREE.PerspectiveCamera(40, 1, 0.5, 1200);
     var controls = new THREE.OrbitControls(camera, canvas);
     controls.enableDamping = true;
     controls.dampingFactor = 0.08;
@@ -564,9 +566,8 @@ button { font: inherit; color: inherit; }
     controls.maxDistance = 280;
     controls.screenSpacePanning = true;
 
-    scene.add(new THREE.HemisphereLight(0xcfeeff, 0x0b2230, 0.65));
-    var sun = new THREE.DirectionalLight(0xfff1dc, 1.3); sun.position.set(-50, 90, 60); scene.add(sun);
-    var rim = new THREE.DirectionalLight(0x6fd3ff, 0.4); rim.position.set(70, 40, -90); scene.add(rim);
+    scene.add(new THREE.HemisphereLight(0xC4DCEA, 0x0B2A36, 0.8));
+    var sun = new THREE.DirectionalLight(0xFFF0DA, 1.45); sun.position.copy(SUN).multiplyScalar(120); scene.add(sun);
 
     /* Layout traced from the original plan view (1 unit = 10 px of the original map; north/up = −z). */
     var RAFTS = [{ x: -10.6, z: -42 }, { x: -10.6, z: -21 }, { x: -10.6, z: 0 }, { x: 10.4, z: 0 }];
@@ -574,43 +575,141 @@ button { font: inherit; color: inherit; }
     var BW = { x: -16.4, z: 21.0, w: 6.4, d: 2.2 };
     var BUOY = { A: { x: -15.9, z: 26.6 }, B: { x: -15.9, z: 13.4 } };
     var TARGET = new THREE.Vector3(-4, 0, -10);
+    var RECTS = RAFTS.map(function (p) { return [p.x, p.z, RW / 2, RD / 2]; }).concat([[BW.x, BW.z, BW.w / 2, BW.d / 2]]);
 
-    /* Breakwater sheltering: full effect at Buoy B, spreading and fading behind the breakwater */
+    /* ---- Shared wave model (GPU shader and CPU float sampling use the same numbers) ---- */
+    var WAVES = [ // angle from travel direction (−z), wavelength, relative amplitude
+      [0, 10, 0.36], [-18, 7.2, 0.20], [22, 13, 0.22], [-35, 5, 0.10], [40, 8.5, 0.12], [10, 3.6, 0.06]
+    ].map(function (w, i) {
+      var a = w[0] * Math.PI / 180;
+      return { dx: Math.sin(a), dz: -Math.cos(a), k: 2 * Math.PI / w[1], w: w[2], ph: i * 1.7 };
+    });
+    var Q = 0.85, K0 = WAVES[0].k;
+    var amp = 0.45, ampT = 0.45, R = 0.22, RT = 0.22, Tv = 4.6, lastA = null;
+
     function rawShelter(x, z) {
       var d = BW.z + 1.1 - z; if (d <= 0) return 0;
-      var behind = Math.max(0, BW.z - z);
-      var s = 2.4 + 0.3 * behind;
+      var behind = Math.max(0, BW.z - z), s = 2.4 + 0.3 * behind;
       return Math.exp(-((x - BW.x) * (x - BW.x)) / (2 * s * s)) * Math.min(1, d / 2.2) * Math.exp(-behind / 70);
     }
     var rawB = rawShelter(BUOY.B.x, BUOY.B.z);
-    function shelter(x, z) { return Math.min(1, rawShelter(x, z) / rawB); }
-
-    var ph0 = 0, ph1 = 0, ph2 = 0;
-    var K0 = 2 * Math.PI / 18, K1 = 2 * Math.PI / 11, K2 = 2 * Math.PI / 7;
-    function eta(x, z) {
-      return 0.55 * Math.sin(K0 * z + 0.05 * x + ph0) +
-             0.30 * Math.sin(K1 * (0.94 * z - 0.34 * x) + ph1 + 1.3) +
-             0.15 * Math.sin(K2 * (0.90 * z + 0.43 * x) + ph2 + 2.1);
+    function rectDist(x, z, r) {
+      var dx = Math.abs(x - r[0]) - r[2], dz = Math.abs(z - r[1]) - r[3];
+      return Math.hypot(Math.max(dx, 0), Math.max(dz, 0)) + Math.min(Math.max(dx, dz), 0);
     }
-    var amp = 0.4, ampT = 0.4, R = 0.8, RT = 0.8, Tv = 3, lastA = null;
-    function height(x, z) { return amp * (1 - R * shelter(x, z)) * eta(x, z); }
+    function smooth(a, b, x) { var t = clamp((x - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); }
+    function height(x, z) {
+      var e = 1e3; for (var r = 0; r < RECTS.length; r++) e = Math.min(e, rectDist(x, z, RECTS[r]));
+      var A = amp * (1 - R * Math.min(1, rawShelter(x, z) / rawB)) * (0.45 + 0.55 * smooth(0, 4, e));
+      var y = 0;
+      for (var i = 0; i < WAVES.length; i++) { var w = WAVES[i]; y += A * w.w * Math.sin(w.k * (w.dx * x + w.dz * z) - w.ph); }
+      return y;
+    }
 
-    /* Water */
-    var SIZE = 260, SEG = 170;
-    var wgeo = new THREE.PlaneGeometry(SIZE, SIZE, SEG, SEG);
-    wgeo.rotateX(-Math.PI / 2);
-    var wpos = wgeo.attributes.position, wa = wpos.array, nv = wpos.count;
-    var bx = new Float32Array(nv), bz = new Float32Array(nv), G = new Float32Array(nv);
-    for (var i = 0; i < nv; i++) { bx[i] = wa[i * 3]; bz[i] = wa[i * 3 + 2]; G[i] = shelter(bx[i], bz[i]); }
-    var wcol = new Float32Array(nv * 3);
-    wgeo.setAttribute('color', new THREE.BufferAttribute(wcol, 3));
-    var deep = new THREE.Color(0x041E2B).convertSRGBToLinear();
-    var crest = new THREE.Color(0x1A7893).convertSRGBToLinear();
-    var calm = new THREE.Color(0x0E5468).convertSRGBToLinear();
-    var water = new THREE.Mesh(wgeo, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.2, metalness: 0.15 }));
+    /* ---- Sky dome ---- */
+    var SKY_GLSL = [
+      'uniform vec3 uTop; uniform vec3 uHor; uniform vec3 uSun; uniform vec3 uSunCol;',
+      'vec3 skyCol(vec3 d){',
+      '  float t = clamp(d.y, 0.0, 1.0);',
+      '  vec3 c = mix(uHor, uTop, pow(t, 0.42));',
+      '  float s = max(dot(normalize(d), uSun), 0.0);',
+      '  return c + uSunCol * (pow(s, 6.0) * 0.22 + pow(s, 350.0) * 5.0);',
+      '}'
+    ].join('\n');
+    var skyU = { uTop: { value: lin(TOP) }, uHor: { value: lin(HOR) }, uSun: { value: SUN }, uSunCol: { value: lin(0xFFE9C8) } };
+    var sky = new THREE.Mesh(new THREE.SphereGeometry(800, 32, 16), new THREE.ShaderMaterial({
+      side: THREE.BackSide, depthWrite: false, fog: false, uniforms: skyU,
+      vertexShader: 'varying vec3 vDir; void main(){ vDir = normalize(position); gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
+      fragmentShader: SKY_GLSL + '\nvarying vec3 vDir; void main(){ gl_FragColor = vec4(skyCol(vDir), 1.0);\n#include <tonemapping_fragment>\n#include <encodings_fragment>\n}'
+    }));
+    sky.renderOrder = -1;
+    scene.add(sky);
+
+    /* ---- Water: Gerstner waves on the GPU ---- */
+    var NW = WAVES.length, NR = RECTS.length;
+    var wU = {
+      uWaves: { value: WAVES.map(function (w) { return new THREE.Vector4(w.dx, w.dz, w.k, Q); }) },
+      uAw: { value: WAVES.map(function (w) { return w.w; }) },
+      uPh: { value: WAVES.map(function (w) { return w.ph; }) },
+      uAmp: { value: amp }, uR: { value: R }, uTime: { value: 0 },
+      uBW: { value: new THREE.Vector2(BW.x, BW.z) }, uRawB: { value: rawB },
+      uRects: { value: RECTS.map(function (r) { return new THREE.Vector4(r[0], r[1], r[2], r[3]); }) },
+      uPose: { value: RECTS.map(function () { return new THREE.Vector3(0, 0, 0); }) },
+      uDeep: { value: lin(0x08303F) }, uScatter: { value: lin(0x1E7C84) },
+      uFogCol: { value: lin(HOR) }, uFogNear: { value: 120 }, uFogFar: { value: 330 },
+      uTop: skyU.uTop, uHor: skyU.uHor, uSun: skyU.uSun, uSunCol: skyU.uSunCol
+    };
+    var waterVS = [
+      '#define NW ' + NW, '#define NR ' + NR,
+      'uniform vec4 uWaves[NW]; uniform float uAw[NW]; uniform float uPh[NW];',
+      'uniform float uAmp; uniform float uR; uniform vec2 uBW; uniform float uRawB;',
+      'uniform vec4 uRects[NR]; uniform vec3 uPose[NR];',
+      'varying vec3 vWorld; varying vec3 vN; varying float vH; varying float vEdge;',
+      'float shelterRaw(vec2 p){',
+      '  float d = uBW.y + 1.1 - p.y; if (d <= 0.0) return 0.0;',
+      '  float behind = max(0.0, uBW.y - p.y); float s = 2.4 + 0.3 * behind; float dx = p.x - uBW.x;',
+      '  return exp(-(dx * dx) / (2.0 * s * s)) * min(1.0, d / 2.2) * exp(-behind / 70.0);',
+      '}',
+      'float rectDist(vec2 p, vec4 r){ vec2 d = abs(p - r.xy) - r.zw; return length(max(d, 0.0)) + min(max(d.x, d.y), 0.0); }',
+      'void main(){',
+      '  vec3 p0 = (modelMatrix * vec4(position, 1.0)).xyz; vec2 xz = p0.xz;',
+      '  float edge = 1000.0; for (int i = 0; i < NR; i++) edge = min(edge, rectDist(xz, uRects[i]));',
+      '  float A = uAmp * (1.0 - uR * min(1.0, shelterRaw(xz) / uRawB)) * (0.45 + 0.55 * smoothstep(0.0, 4.0, edge));',
+      '  vec3 P = p0; vec3 N = vec3(0.0, 1.0, 0.0);',
+      '  for (int i = 0; i < NW; i++) {',
+      '    vec2 D = uWaves[i].xy; float k = uWaves[i].z; float q = uWaves[i].w; float a = A * uAw[i];',
+      '    float f = k * dot(D, xz) - uPh[i]; float c = cos(f); float s = sin(f);',
+      '    P.x += q * a * D.x * c; P.z += q * a * D.y * c; P.y += a * s;',
+      '    N.x -= D.x * k * a * c; N.z -= D.y * k * a * c; N.y -= q * k * a * s;',
+      '  }',
+      // keep the water surface below each floating structure so nothing looks submerged
+      '  for (int i = 0; i < NR; i++) {',
+      '    vec2 l = P.xz - uRects[i].xy;',
+      '    if (abs(l.x) < uRects[i].z + 0.3 && abs(l.y) < uRects[i].w + 0.3) {',
+      '      P.y = min(P.y, uPose[i].x + uPose[i].y * l.x + uPose[i].z * l.y - 0.18);',
+      '    }',
+      '  }',
+      '  vWorld = P; vN = N; vH = P.y / max(uAmp, 0.05); vEdge = edge;',
+      '  gl_Position = projectionMatrix * viewMatrix * vec4(P, 1.0);',
+      '}'
+    ].join('\n');
+    var waterFS = [
+      SKY_GLSL,
+      'uniform vec3 uDeep; uniform vec3 uScatter; uniform vec3 uFogCol; uniform float uFogNear; uniform float uFogFar; uniform float uTime;',
+      'varying vec3 vWorld; varying vec3 vN; varying float vH; varying float vEdge;',
+      'float hash(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }',
+      'float noise(vec2 p){ vec2 i = floor(p); vec2 f = fract(p); vec2 u = f * f * (3.0 - 2.0 * f);',
+      '  return mix(mix(hash(i), hash(i + vec2(1.0, 0.0)), u.x), mix(hash(i + vec2(0.0, 1.0)), hash(i + vec2(1.0, 1.0)), u.x), u.y); }',
+      'void main(){',
+      '  vec2 q = vWorld.xz;',
+      '  float r1 = noise(q * 1.6 + vec2(0.0, uTime * 0.9)) - 0.5;',
+      '  float r2 = noise(q * 4.1 - vec2(uTime * 0.7, uTime * 1.4)) - 0.5;',
+      '  vec3 N = normalize(normalize(vN) + vec3(r1 * 0.09 + r2 * 0.05, 0.0, r2 * 0.09 - r1 * 0.05));',
+      '  vec3 V = normalize(cameraPosition - vWorld);',
+      '  float fres = 0.02 + 0.98 * pow(1.0 - max(dot(N, V), 0.0), 5.0);',
+      '  vec3 Rf = reflect(-V, N); Rf.y = abs(Rf.y);',
+      '  vec3 refl = skyCol(Rf);',
+      '  float lit = 0.55 + 0.45 * max(dot(N, uSun), 0.0);',
+      '  vec3 body = mix(uDeep, uScatter, clamp(0.28 + 0.5 * vH, 0.0, 1.0)) * lit;',
+      '  vec3 col = mix(body, refl, clamp(fres, 0.0, 0.85));',
+      '  float sd = max(dot(Rf, uSun), 0.0);',
+      '  col += uSunCol * (pow(sd, 900.0) * 7.0 + pow(sd, 90.0) * 0.3);',
+      '  float fn = noise(q * 0.9 + uTime * 0.12) * noise(q * 2.4 - uTime * 0.18);',
+      '  float crest = smoothstep(0.62, 1.05, vH) * smoothstep(0.12, 0.38, fn);',
+      '  float ring = (1.0 - smoothstep(0.0, 1.8, vEdge)) * smoothstep(0.05, 0.3, fn + 0.08);',
+      '  col = mix(col, vec3(0.88, 0.93, 0.95), clamp(crest * 0.75 + ring * 0.8, 0.0, 1.0));',
+      '  col = mix(col, uFogCol, smoothstep(uFogNear, uFogFar, length(cameraPosition - vWorld)));',
+      '  gl_FragColor = vec4(col, 1.0);',
+      '#include <tonemapping_fragment>',
+      '#include <encodings_fragment>',
+      '}'
+    ].join('\n');
+    var water = new THREE.Mesh(new THREE.PlaneGeometry(340, 340, 380, 380).rotateX(-Math.PI / 2),
+      new THREE.ShaderMaterial({ uniforms: wU, vertexShader: waterVS, fragmentShader: waterFS }));
+    water.frustumCulled = false;
     scene.add(water);
 
-    /* PV panel texture */
+    /* ---- PV rafts ---- */
     function panelTexture() {
       var c = document.createElement('canvas'); c.width = 256; c.height = 176;
       var x = c.getContext('2d');
@@ -629,77 +728,77 @@ button { font: inherit; color: inherit; }
       t.anisotropy = renderer.capabilities.getMaxAnisotropy();
       return t;
     }
-    var panelMat = new THREE.MeshStandardMaterial({ map: panelTexture(), metalness: 0.5, roughness: 0.24 });
+    var panelMat = new THREE.MeshStandardMaterial({ map: panelTexture(), color: lin(0xC8D2E6), metalness: 0.25, roughness: 0.38 });
     var panelGeo = new THREE.BoxGeometry(2.45, 0.07, 1.7);
-    var floatMat = new THREE.MeshStandardMaterial({ color: 0xE3E9EB, roughness: 0.75 });
-    var walkMat = new THREE.MeshStandardMaterial({ color: 0xB9C5CA, roughness: 0.85 });
+    var floatMat = new THREE.MeshStandardMaterial({ color: lin(0xE3E9EB), roughness: 0.75 });
+    var walkMat = new THREE.MeshStandardMaterial({ color: lin(0xB9C5CA), roughness: 0.85 });
 
     var floaters = [];
-    RAFTS.forEach(function (p, idx) {
+    RAFTS.forEach(function (p) {
       var g = new THREE.Group();
-      var base = new THREE.Mesh(new THREE.BoxGeometry(RW, 0.9, RD), floatMat); base.position.y = 0.05; g.add(base);
+      var base = new THREE.Mesh(new THREE.BoxGeometry(RW, 1.3, RD), floatMat); base.position.y = 0.1; g.add(base);
       var inst = new THREE.InstancedMesh(panelGeo, panelMat, 48);
       var m = new THREE.Matrix4(), q = new THREE.Quaternion().setFromEuler(new THREE.Euler(-0.21, 0, 0)), sc = new THREE.Vector3(1, 1, 1);
       var n = 0, sx = -(6 * 2.45 + 5 * 0.12) / 2 + 1.225, sz = -(8 * 1.7 + 7 * 0.32) / 2 + 0.85;
       for (var r = 0; r < 8; r++) {
-        for (var c = 0; c < 6; c++) { m.compose(new THREE.Vector3(sx + c * 2.57, 0.82, sz + r * 2.02), q, sc); inst.setMatrixAt(n++, m); }
-        if (r < 7) { var w = new THREE.Mesh(new THREE.BoxGeometry(15.4, 0.06, 0.26), walkMat); w.position.set(0, 0.53, sz + r * 2.02 + 1.01); g.add(w); }
+        for (var c = 0; c < 6; c++) { m.compose(new THREE.Vector3(sx + c * 2.57, 1.12, sz + r * 2.02), q, sc); inst.setMatrixAt(n++, m); }
+        if (r < 7) { var w = new THREE.Mesh(new THREE.BoxGeometry(15.4, 0.06, 0.26), walkMat); w.position.set(0, 0.78, sz + r * 2.02 + 1.01); g.add(w); }
       }
       g.add(inst);
       g.position.set(p.x, 0, p.z);
       scene.add(g);
-      floaters.push({ obj: g, x: p.x, z: p.z, hw: RW / 2, hd: RD / 2, y: 0.05, k: 0.6 });
+      floaters.push({ obj: g, x: p.x, z: p.z, hw: RW / 2, hd: RD / 2, y: 0, k: 0.5 });
     });
 
-    /* Breakwater: four floating modules */
+    /* ---- Breakwater: four floating modules ---- */
     var bwg = new THREE.Group();
-    var bwMat = new THREE.MeshStandardMaterial({ color: new THREE.Color(0xF29A2B).convertSRGBToLinear(), roughness: 0.5 });
-    var bwDark = new THREE.MeshStandardMaterial({ color: 0x8A4D12, roughness: 0.7 });
+    var bwMat = new THREE.MeshStandardMaterial({ color: lin(0xF29A2B), roughness: 0.5 });
+    var bwDark = new THREE.MeshStandardMaterial({ color: lin(0x8A4D12), roughness: 0.7 });
     for (var b = 0; b < 4; b++) {
-      var mod = new THREE.Mesh(new THREE.BoxGeometry(1.5, 1.05, BW.d), bwMat);
-      mod.position.set(-2.4 + b * 1.6, 0.15, 0); bwg.add(mod);
+      var mod = new THREE.Mesh(new THREE.BoxGeometry(1.5, 1.2, BW.d), bwMat);
+      mod.position.set(-2.4 + b * 1.6, 0.2, 0); bwg.add(mod);
     }
-    var tie = new THREE.Mesh(new THREE.BoxGeometry(BW.w, 0.12, 0.28), bwDark); tie.position.set(0, 0.72, 0); bwg.add(tie);
+    var tie = new THREE.Mesh(new THREE.BoxGeometry(BW.w, 0.12, 0.28), bwDark); tie.position.set(0, 0.85, 0); bwg.add(tie);
     bwg.position.set(BW.x, 0, BW.z);
     scene.add(bwg);
-    floaters.push({ obj: bwg, x: BW.x, z: BW.z, hw: BW.w / 2, hd: BW.d / 2, y: 0, k: 0.85 });
+    floaters.push({ obj: bwg, x: BW.x, z: BW.z, hw: BW.w / 2, hd: BW.d / 2, y: 0, k: 0.8 });
 
-    /* Buoys */
+    /* ---- Buoys ---- */
     var hits = [], buoys = {};
     function makeBuoy(id, color) {
       var g = new THREE.Group();
-      var body = new THREE.Mesh(new THREE.SphereGeometry(1.45, 32, 20), new THREE.MeshStandardMaterial({ color: new THREE.Color(color).convertSRGBToLinear(), roughness: 0.4, emissive: new THREE.Color(color).convertSRGBToLinear(), emissiveIntensity: 0.18 }));
-      body.scale.y = 0.85; body.position.y = 0.35; g.add(body);
+      var body = new THREE.Mesh(new THREE.SphereGeometry(1.45, 32, 20), new THREE.MeshStandardMaterial({ color: lin(color), roughness: 0.4, emissive: lin(color), emissiveIntensity: 0.12 }));
+      body.scale.y = 0.85; body.position.y = 0.45; g.add(body);
       var collar = new THREE.Mesh(new THREE.TorusGeometry(1.42, 0.17, 12, 36), new THREE.MeshStandardMaterial({ color: 0x23323B, roughness: 0.6 }));
-      collar.rotation.x = Math.PI / 2; collar.position.y = 0.35; g.add(collar);
+      collar.rotation.x = Math.PI / 2; collar.position.y = 0.45; g.add(collar);
       var mast = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.12, 2.6, 10), new THREE.MeshStandardMaterial({ color: 0x31434D, roughness: 0.5, metalness: 0.4 }));
-      mast.position.y = 1.95; g.add(mast);
-      var lamp = new THREE.Mesh(new THREE.SphereGeometry(0.3, 16, 12), new THREE.MeshBasicMaterial({ color: new THREE.Color(color).convertSRGBToLinear() }));
-      lamp.position.y = 3.35; g.add(lamp);
+      mast.position.y = 2.05; g.add(mast);
+      var lamp = new THREE.Mesh(new THREE.SphereGeometry(0.3, 16, 12), new THREE.MeshBasicMaterial({ color: lin(color) }));
+      lamp.position.y = 3.45; g.add(lamp);
       var hit = new THREE.Mesh(new THREE.SphereGeometry(3.4, 12, 8), new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false }));
       hit.position.y = 1.4; hit.userData.id = id; g.add(hit); hits.push(hit);
       var p = BUOY[id];
       g.position.set(p.x, 0, p.z);
       scene.add(g);
-      var ring = new THREE.Mesh(new THREE.RingGeometry(2.2, 2.55, 64), new THREE.MeshBasicMaterial({ color: 0x56D6F5, transparent: true, opacity: 0.9, side: THREE.DoubleSide, depthWrite: false }));
+      var ring = new THREE.Mesh(new THREE.RingGeometry(2.2, 2.55, 64), new THREE.MeshBasicMaterial({ color: 0x56D6F5, transparent: true, opacity: 0.95, side: THREE.DoubleSide, depthWrite: false, fog: false }));
       ring.rotation.x = -Math.PI / 2; scene.add(ring);
-      var pulse = new THREE.Mesh(new THREE.RingGeometry(2.2, 2.4, 64), new THREE.MeshBasicMaterial({ color: 0x56D6F5, transparent: true, opacity: 0.5, side: THREE.DoubleSide, depthWrite: false }));
+      var pulse = new THREE.Mesh(new THREE.RingGeometry(2.2, 2.4, 64), new THREE.MeshBasicMaterial({ color: 0x56D6F5, transparent: true, opacity: 0.5, side: THREE.DoubleSide, depthWrite: false, fog: false }));
       pulse.rotation.x = -Math.PI / 2; scene.add(pulse);
-      buoys[id] = { g: g, lamp: lamp, ring: ring, pulse: pulse };
+      buoys[id] = { g: g, lamp: lamp, ring: ring, pulse: pulse, off: false };
       floaters.push({ obj: g, x: p.x, z: p.z, hw: 1, hd: 1, y: 0, k: 1 });
     }
     makeBuoy('A', 0xFFCB3D);
     makeBuoy('B', 0xFF8A3A);
 
-    /* Wave direction arrow on the water */
+    /* ---- Wave direction arrow ---- */
     var sh = new THREE.Shape();
     sh.moveTo(-0.9, -5); sh.lineTo(0.9, -5); sh.lineTo(0.9, 1.4); sh.lineTo(2.6, 1.4); sh.lineTo(0, 5); sh.lineTo(-2.6, 1.4); sh.lineTo(-0.9, 1.4); sh.closePath();
-    var arrow = new THREE.Mesh(new THREE.ShapeGeometry(sh), new THREE.MeshBasicMaterial({ color: 0xE7F2F6, transparent: true, opacity: 0.6, side: THREE.DoubleSide, depthWrite: false }));
+    var arrow = new THREE.Mesh(new THREE.ShapeGeometry(sh), new THREE.MeshBasicMaterial({ color: 0xFFFFFF, transparent: true, opacity: 0.75, side: THREE.DoubleSide, depthWrite: false, fog: false }));
     arrow.rotation.x = -Math.PI / 2;
-    arrow.position.set(-32, 2.2, 28);
+    arrow.position.set(-32, 2.4, 28);
     scene.add(arrow);
 
-    /* HTML labels pinned to 3D anchors */
+    /* ---- HTML labels pinned to 3D anchors ---- */
     var layer = $('labels'), labels = [];
     function addLabel(html, cls, x, y, z, follow) {
       var d = document.createElement('div');
@@ -710,15 +809,15 @@ button { font: inherit; color: inherit; }
       labels.push(L);
       return L;
     }
-    RAFTS.forEach(function (p, i) { var e = i === 3 ? 1 : -1; addLabel('แพ ' + (i + 1), 'soft', p.x + e * (RW / 2 + 3), 1.6, p.z, floaters[i]); });
-    addLabel('แผงกันคลื่น', '', BW.x + 8.5, 0.6, BW.z + 1, floaters[4]);
-    addLabel('↑ ทิศทางคลื่น', 'arrow soft', -32, 2.4, 35);
-    var lblA = addLabel('<i style="background:#FFCB3D">A</i><span class="lt">ก่อนแผง</span><b id="lvA">0.00 m</b>', 'buoy', BUOY.A.x, 6.6, BUOY.A.z, floaters[5]);
-    var lblB = addLabel('<i style="background:#FF8A3A">B</i><span class="lt">หลังแผง</span><b id="lvB">0.00 m</b>', 'buoy', BUOY.B.x, 6.6, BUOY.B.z, floaters[6]);
+    RAFTS.forEach(function (p, i) { var e = i === 3 ? 1 : -1; addLabel('แพ ' + (i + 1), 'soft', p.x + e * (RW / 2 + 3), 1.8, p.z, floaters[i]); });
+    addLabel('แผงกันคลื่น', '', BW.x + 8.5, 0.8, BW.z + 1, floaters[4]);
+    addLabel('↑ ทิศทางคลื่น', 'arrow soft', -32, 2.6, 35);
+    var lblA = addLabel('<i style="background:#FFCB3D">A</i><span class="lt">ก่อนแผง</span><b id="lvA">0.00 m</b>', 'buoy', BUOY.A.x, 6.8, BUOY.A.z, floaters[5]);
+    var lblB = addLabel('<i style="background:#FF8A3A">B</i><span class="lt">หลังแผง</span><b id="lvB">0.00 m</b>', 'buoy', BUOY.B.x, 6.8, BUOY.B.z, floaters[6]);
     lblA.el.addEventListener('click', function () { select('A'); });
     lblB.el.addEventListener('click', function () { select('B'); });
 
-    /* Picking */
+    /* ---- Picking ---- */
     var ray = new THREE.Raycaster(), ptr = new THREE.Vector2(), down = null;
     function pick(e) {
       var r = canvas.getBoundingClientRect();
@@ -738,7 +837,7 @@ button { font: inherit; color: inherit; }
       canvas.style.cursor = pick(e) ? 'pointer' : '';
     });
 
-    /* Camera presets */
+    /* ---- Camera presets ---- */
     var tween = null, W = 1, H = 1;
     function viewPose(name) {
       var aspect = W / H, tgt = TARGET.clone(), pos;
@@ -756,9 +855,7 @@ button { font: inherit; color: inherit; }
       }
       return { pos: pos, tgt: tgt };
     }
-    var view = '3d';
     function goView(name, instant) {
-      view = name;
       $('v3d').setAttribute('aria-pressed', name === '3d');
       $('vtop').setAttribute('aria-pressed', name === 'top');
       $('vside').setAttribute('aria-pressed', name === 'side');
@@ -783,43 +880,31 @@ button { font: inherit; color: inherit; }
     if (window.ResizeObserver) new ResizeObserver(resize).observe(host);
     else window.addEventListener('resize', resize);
 
-    /* Frame loop */
-    var v = new THREE.Vector3(), last = performance.now();
+    /* ---- Frame loop ---- */
+    var v = new THREE.Vector3(), last = performance.now(), clock = 0;
     function frame(now) {
       var dt = Math.min(0.05, (now - last) / 1000); last = now;
       var sp = reduced ? 0.25 : 1;
-      var w = 2 * Math.PI / Tv;
-      ph0 += w * dt * sp; ph1 += w * 1.22 * dt * sp; ph2 += w * 1.55 * dt * sp;
-      amp += (ampT - amp) * Math.min(1, dt * 1.2);
-      R += (RT - R) * Math.min(1, dt * 1.2);
+      clock += dt * sp;
+      var w0 = 2 * Math.PI / Tv;
+      for (var i = 0; i < NW; i++) { WAVES[i].ph += w0 * Math.sqrt(WAVES[i].k / K0) * dt * sp; wU.uPh.value[i] = WAVES[i].ph; }
+      amp += (ampT - amp) * Math.min(1, dt * 0.8);
+      R += (RT - R) * Math.min(1, dt * 0.8);
+      wU.uAmp.value = amp; wU.uR.value = R; wU.uTime.value = clock;
 
-      var ref = Math.max(amp, 0.2);
-      for (var i = 0; i < nv; i++) {
-        var f = 1 - R * G[i];
-        var y = amp * f * eta(bx[i], bz[i]);
-        wa[i * 3 + 1] = y;
-        var t = clamp(0.5 + y / (2 * ref), 0, 1) * (0.35 + 0.65 * f);
-        var j = i * 3, mixC = 1 - f;
-        wcol[j] = deep.r + (crest.r - deep.r) * t + (calm.r - deep.r) * mixC * 0.4;
-        wcol[j + 1] = deep.g + (crest.g - deep.g) * t + (calm.g - deep.g) * mixC * 0.4;
-        wcol[j + 2] = deep.b + (crest.b - deep.b) * t + (calm.b - deep.b) * mixC * 0.4;
-      }
-      wpos.needsUpdate = true;
-      wgeo.attributes.color.needsUpdate = true;
-      wgeo.computeVertexNormals();
-
-      floaters.forEach(function (o) {
-        var hc = height(o.x, o.z);
-        var sx = (height(o.x + o.hw, o.z) - height(o.x - o.hw, o.z)) / (2 * o.hw);
-        var sz = (height(o.x, o.z + o.hd) - height(o.x, o.z - o.hd)) / (2 * o.hd);
+      floaters.forEach(function (o, idx) {
+        var hc = (height(o.x, o.z) + height(o.x - o.hw * 0.6, o.z) + height(o.x + o.hw * 0.6, o.z) + height(o.x, o.z - o.hd * 0.6) + height(o.x, o.z + o.hd * 0.6)) / 5;
+        var sx = (height(o.x + o.hw, o.z) - height(o.x - o.hw, o.z)) / (2 * o.hw) * o.k;
+        var sz = (height(o.x, o.z + o.hd) - height(o.x, o.z - o.hd)) / (2 * o.hd) * o.k;
         o.obj.position.y = o.y + hc * o.k;
-        o.obj.rotation.z = Math.atan(sx) * o.k;
-        o.obj.rotation.x = -Math.atan(sz) * o.k;
+        o.obj.rotation.z = Math.atan(sx);
+        o.obj.rotation.x = -Math.atan(sz);
+        if (idx < NR) wU.uPose.value[idx].set(o.obj.position.y, sx, sz);
       });
 
       ['A', 'B'].forEach(function (id) {
         var bb = buoys[id], on = state.sel === id, p = BUOY[id];
-        var y = height(p.x, p.z) + 0.12;
+        var y = bb.g.position.y + 0.1;
         bb.ring.position.set(p.x, y, p.z); bb.ring.visible = on;
         var ph = ((now / 1600) % 1);
         bb.pulse.position.set(p.x, y, p.z); bb.pulse.visible = on && !reduced;
@@ -830,12 +915,13 @@ button { font: inherit; color: inherit; }
 
       if (tween) {
         var e = Math.min(1, (now - tween.s) / tween.d);
-        var q = e < 0.5 ? 4 * e * e * e : 1 - Math.pow(-2 * e + 2, 3) / 2;
-        camera.position.lerpVectors(tween.p0, tween.p1, q);
-        controls.target.lerpVectors(tween.t0, tween.t1, q);
+        var qe = e < 0.5 ? 4 * e * e * e : 1 - Math.pow(-2 * e + 2, 3) / 2;
+        camera.position.lerpVectors(tween.p0, tween.p1, qe);
+        controls.target.lerpVectors(tween.t0, tween.t1, qe);
         if (e >= 1) tween = null;
       }
       controls.update();
+      sky.position.copy(camera.position);
 
       for (var l = 0; l < labels.length; l++) {
         var L = labels[l];
@@ -854,12 +940,12 @@ button { font: inherit; color: inherit; }
 
     return {
       sync: function () {
-        var a = val('A', cursor), b = val('B', cursor), r = red(cursor);
+        var a = val('A', cursor), b = val('B', cursor);
         if (a) lastA = a;
-        var h = lastA ? lastA.h : 0.15;
-        ampT = clamp(0.18 + h * 2.0, 0.18, 1.2);
-        if (r != null) RT = clamp(r / 100, 0, 0.98);
-        Tv = clamp((lastA ? lastA.p : 1.8) * 1.7, 2.2, 5);
+        var h = lastA ? lastA.h : 1.2;
+        ampT = clamp(h * 0.36, 0.2, 0.6);
+        if (a && b && a.h > 0.01) RT = clamp(1 - b.h / a.h, 0, 0.95);
+        Tv = clamp(lastA ? lastA.p : 4.6, 3, 7);
         buoys.A.off = !a; buoys.B.off = !b;
         $('lvA').textContent = a ? a.h.toFixed(2) + ' m' : 'OFFLINE';
         $('lvB').textContent = b ? b.h.toFixed(2) + ' m' : 'OFFLINE';
